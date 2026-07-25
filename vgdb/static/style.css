@@ -80,8 +80,31 @@ td { padding: 0; border-bottom: 1px solid var(--border); }
 
 tbody#games tr:hover { background: var(--row); }
 
+.col-cover { width: 3.75rem; }
 .col-rating { width: 5rem; }
 .col-actions { width: 2.5rem; }
+
+.cover {
+  display: block;
+  width: 3rem;
+  height: 3rem;
+  margin: 0.4rem auto;
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.cover:hover, .cover.hovered { border-color: var(--accent); border-style: solid; }
+.cover.busy { opacity: 0.4; }
+
+/* contain, not cover: nothing gets cut, whatever shape the source is. */
+.cover img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
 
 /* Cells are inputs: changing a rating must not cost an extra click. */
 td input {
