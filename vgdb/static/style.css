@@ -46,6 +46,17 @@ h1 {
   color: var(--muted);
 }
 
+#search {
+  flex: 1;
+  max-width: 20rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: inherit;
+  font: inherit;
+}
+
 #count {
   margin-left: auto;
   color: var(--muted);

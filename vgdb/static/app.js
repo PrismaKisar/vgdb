@@ -1,6 +1,7 @@
 "use strict";
 
 const tbody = document.getElementById("games");
+const search = document.getElementById("search");
 const count = document.getElementById("count");
 const empty = document.getElementById("empty");
 
@@ -25,11 +26,12 @@ async function remove(title) {
   await fetch(`/api/games/${encodeURIComponent(title)}`, { method: "DELETE" });
 }
 
-function field(value, options = {}) {
+function field(value, { cellClass, ...options } = {}) {
   const input = document.createElement("input");
   input.value = value ?? "";
   Object.assign(input, options);
   const cell = document.createElement("td");
+  if (cellClass) cell.className = cellClass;
   cell.append(input);
   return { input, cell };
 }
@@ -49,7 +51,7 @@ function row(game) {
   let storedTitle = game.title;
 
   const fields = {
-    title: field(game.title),
+    title: field(game.title, { cellClass: "title-cell" }),
     rating: field(game.rating, { type: "number", min: 1, max: 10, step: 0.5 }),
     notes: field(game.notes, { placeholder: "—" }),
   };
@@ -79,6 +81,7 @@ function row(game) {
     if (!confirm(`Rimuovere "${storedTitle}" dall'archivio?`)) return;
     await remove(storedTitle);
     tr.remove();
+    updateCount();
   });
   const actions = document.createElement("td");
   actions.append(button);
@@ -87,14 +90,35 @@ function row(game) {
   return tr;
 }
 
+/** Visible out of total, so an active filter is never mistaken for an empty archive. */
+function updateCount() {
+  const rows = [...tbody.children];
+  const shown = rows.filter((tr) => !tr.hidden);
+  count.textContent = rows.length
+    ? `${shown.length}${shown.length === rows.length ? "" : ` / ${rows.length}`} giochi`
+    : "";
+  empty.hidden = rows.length > 0;
+}
+
+function filter() {
+  const term = search.value.trim().toLowerCase();
+  for (const tr of tbody.children) {
+    // Explicitly the title field, so further columns cannot break the filter.
+    const title = tr.querySelector(".title-cell input").value.toLowerCase();
+    tr.hidden = term !== "" && !title.includes(term);
+  }
+  updateCount();
+}
+
+search.addEventListener("input", filter);
+
 async function reload() {
   const games = await fetchGames();
   // Sorted by rating once, on load: re-sorting after every edit would make
   // rows jump out from under the cursor during a recalibration pass.
   games.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
   tbody.replaceChildren(...games.map(row));
-  count.textContent = games.length ? `${games.length} giochi` : "";
-  empty.hidden = games.length > 0;
+  filter();
 }
 
 const draft = {
