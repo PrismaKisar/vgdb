@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vgdb</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>vgdb</h1>
+    <span id="count"></span>
+  </header>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="col-title">Titolo</th>
+        <th class="col-rating">Voto</th>
+        <th class="col-notes">Note</th>
+      </tr>
+    </thead>
+    <tbody id="games"></tbody>
+  </table>
+
+  <p id="empty" hidden>Nessun gioco in archivio.</p>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
