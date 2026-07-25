@@ -3,7 +3,10 @@ name = "vgdb"
 version = "0.1.0"
 description = "Archivio personale dei videogiochi giocati"
 requires-python = ">=3.11"
-dependencies = ["flask>=3.0"]
+dependencies = [
+    "flask>=3.0",
+    "pillow>=12.3.0",
+]
 
 [project.scripts]
 vgdb = "vgdb.cli:main"
