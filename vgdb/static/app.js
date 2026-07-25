@@ -81,12 +81,23 @@ function row(game) {
     if (!confirm(`Rimuovere "${storedTitle}" dall'archivio?`)) return;
     await remove(storedTitle);
     tr.remove();
+    updateCount();
   });
   const actions = document.createElement("td");
   actions.append(button);
 
   tr.append(fields.title.cell, fields.rating.cell, fields.notes.cell, actions);
   return tr;
+}
+
+/** Visible out of total, so an active filter is never mistaken for an empty archive. */
+function updateCount() {
+  const rows = [...tbody.children];
+  const shown = rows.filter((tr) => !tr.hidden);
+  count.textContent = rows.length
+    ? `${shown.length}${shown.length === rows.length ? "" : ` / ${rows.length}`} giochi`
+    : "";
+  empty.hidden = rows.length > 0;
 }
 
 function filter() {
@@ -96,6 +107,7 @@ function filter() {
     const title = tr.querySelector(".title-cell input").value.toLowerCase();
     tr.hidden = term !== "" && !title.includes(term);
   }
+  updateCount();
 }
 
 search.addEventListener("input", filter);
@@ -106,8 +118,6 @@ async function reload() {
   // rows jump out from under the cursor during a recalibration pass.
   games.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
   tbody.replaceChildren(...games.map(row));
-  count.textContent = games.length ? `${games.length} giochi` : "";
-  empty.hidden = games.length > 0;
   filter();
 }
 
