@@ -120,6 +120,24 @@ def test_the_stored_cover_can_be_fetched_back(client, archive):
     assert response.data == (archive.parent / "covers" / cover).read_bytes()
 
 
+def test_editing_a_game_keeps_its_cover(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8})
+    attach(client, "Celeste")
+
+    client.put("/api/games/Celeste", json={"rating": 6, "notes": "recalibrated"})
+
+    assert "cover" in store.load(archive)[0]
+
+
+def test_renaming_a_game_keeps_its_cover(client, archive):
+    client.put("/api/games/Celest", json={"rating": 8})
+    attach(client, "Celest")
+
+    client.put("/api/games/Celeste", json={"rating": 8, "previousTitle": "Celest"})
+
+    assert "cover" in store.load(archive)[0]
+
+
 def test_a_file_that_is_not_an_image_is_rejected(client, archive):
     client.put("/api/games/Celeste", json={"rating": 8})
 

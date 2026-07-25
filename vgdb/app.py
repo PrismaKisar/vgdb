@@ -51,7 +51,14 @@ def create_app(archive: Path) -> Flask:
             if body.get(field):
                 game[field] = body[field]
 
-        store.upsert(archive, game, previous_title=body.get("previousTitle"))
+        # The cover is attached by its own endpoint, so a plain edit of the
+        # rating or the notes must not drop it.
+        previous_title = body.get("previousTitle")
+        existing = store.find(archive, previous_title or title)
+        if existing and existing.get("cover"):
+            game["cover"] = existing["cover"]
+
+        store.upsert(archive, game, previous_title=previous_title)
         return jsonify(game)
 
     @app.post("/api/games/<title>/cover")
