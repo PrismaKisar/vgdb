@@ -47,4 +47,10 @@ def create_app(archive: Path) -> Flask:
         store.upsert(archive, game)
         return jsonify(game)
 
+    @app.delete("/api/games/<title>")
+    def remove_game(title):
+        if not store.delete(archive, title):
+            return jsonify({"error": f"{title} is not in the archive"}), 404
+        return jsonify({"removed": title})
+
     return app

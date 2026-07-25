@@ -60,6 +60,19 @@ def test_a_repeated_put_recalibrates_the_rating(client, archive):
     ]
 
 
+def test_delete_removes_the_game(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8})
+
+    response = client.delete("/api/games/Celeste")
+
+    assert response.status_code == 200
+    assert store.load(archive) == []
+
+
+def test_deleting_an_absent_game_is_a_404(client):
+    assert client.delete("/api/games/Missing").status_code == 404
+
+
 @pytest.mark.parametrize("rating", [0, 11, -3, "eight", None])
 def test_an_invalid_rating_is_rejected(client, archive, rating):
     response = client.put("/api/games/Celeste", json={"rating": rating})
