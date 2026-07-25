@@ -26,6 +26,69 @@ async function remove(title) {
   await fetch(`/api/games/${encodeURIComponent(title)}`, { method: "DELETE" });
 }
 
+async function uploadCover(title, file) {
+  const payload = new FormData();
+  payload.append("file", file);
+  const response = await fetch(`/api/games/${encodeURIComponent(title)}/cover`, {
+    method: "POST",
+    body: payload,
+  });
+  if (!response.ok) {
+    const { error } = await response.json().catch(() => ({}));
+    throw new Error(error || "Caricamento copertina fallito");
+  }
+  return response.json();
+}
+
+/** A cover slot: click to pick a file, or drop one onto it. */
+function coverCell(game, titleNow) {
+  const cell = document.createElement("td");
+  const slot = document.createElement("label");
+  slot.className = "cover";
+  slot.title = "Trascina qui un'immagine, o clicca per sceglierla";
+
+  const picture = document.createElement("img");
+  picture.alt = "";
+  picture.hidden = !game.cover;
+  if (game.cover) picture.src = `/covers/${encodeURIComponent(game.cover)}`;
+
+  const chooser = document.createElement("input");
+  chooser.type = "file";
+  chooser.accept = "image/*";
+  chooser.hidden = true;
+
+  async function send(file) {
+    if (!file) return;
+    slot.classList.add("busy");
+    try {
+      const saved = await uploadCover(titleNow(), file);
+      // The name is stable, so bust the browser cache on replacement.
+      picture.src = `/covers/${encodeURIComponent(saved.cover)}?v=${Date.now()}`;
+      picture.hidden = false;
+    } catch (error) {
+      slot.title = error.message;
+    } finally {
+      slot.classList.remove("busy");
+    }
+  }
+
+  chooser.addEventListener("change", () => send(chooser.files[0]));
+  slot.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    slot.classList.add("hovered");
+  });
+  slot.addEventListener("dragleave", () => slot.classList.remove("hovered"));
+  slot.addEventListener("drop", (e) => {
+    e.preventDefault();
+    slot.classList.remove("hovered");
+    send(e.dataTransfer.files[0]);
+  });
+
+  slot.append(picture, chooser);
+  cell.append(slot);
+  return cell;
+}
+
 function field(value, { cellClass, ...options } = {}) {
   const input = document.createElement("input");
   input.value = value ?? "";
@@ -86,7 +149,9 @@ function row(game) {
   const actions = document.createElement("td");
   actions.append(button);
 
-  tr.append(fields.title.cell, fields.rating.cell, fields.notes.cell, actions);
+  const cover = coverCell(game, () => storedTitle);
+
+  tr.append(cover, fields.title.cell, fields.rating.cell, fields.notes.cell, actions);
   return tr;
 }
 
