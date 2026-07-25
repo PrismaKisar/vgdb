@@ -41,6 +41,53 @@ def test_saving_leaves_no_scratch_files(tmp_path):
     assert [f.name for f in tmp_path.iterdir()] == ["games.json"]
 
 
+def test_upsert_adds_an_unseen_game(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(archive, [{"title": "Hollow Knight", "rating": 9}])
+
+    store.upsert(archive, {"title": "Celeste", "rating": 8})
+
+    assert [g["title"] for g in store.load(archive)] == ["Hollow Knight", "Celeste"]
+
+
+def test_upsert_updates_without_duplicating(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(archive, [{"title": "Hollow Knight", "rating": 9, "notes": "great"}])
+
+    store.upsert(archive, {"title": "Hollow Knight", "rating": 10, "notes": "replayed"})
+
+    assert store.load(archive) == [
+        {"title": "Hollow Knight", "rating": 10, "notes": "replayed"}
+    ]
+
+
+def test_titles_match_regardless_of_case(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(archive, [{"title": "Hollow Knight", "rating": 9}])
+
+    store.upsert(archive, {"title": "hollow knight", "rating": 7})
+
+    assert store.load(archive) == [{"title": "hollow knight", "rating": 7}]
+
+
+def test_delete_removes_only_the_named_game(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(
+        archive,
+        [{"title": "Hollow Knight", "rating": 9}, {"title": "Celeste", "rating": 8}],
+    )
+
+    assert store.delete(archive, "hollow knight") is True
+    assert store.load(archive) == [{"title": "Celeste", "rating": 8}]
+
+
+def test_deleting_an_absent_game_reports_it(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(archive, [{"title": "Celeste", "rating": 8}])
+
+    assert store.delete(archive, "Missing") is False
+
+
 def test_the_archive_path_does_not_depend_on_the_working_directory(monkeypatch):
     monkeypatch.delenv("VGDB_FILE", raising=False)
 

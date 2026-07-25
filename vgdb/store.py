@@ -46,3 +46,30 @@ def save(path: Path, games: list[dict]) -> None:
     except BaseException:
         Path(scratch).unlink(missing_ok=True)
         raise
+
+
+def _same_title(one: str, other: str) -> bool:
+    """The title identifies the game, ignoring case and surrounding spaces."""
+    return one.strip().casefold() == other.strip().casefold()
+
+
+def upsert(path: Path, game: dict) -> None:
+    """Add a game to the archive, replacing the one with the same title."""
+    games = load(path)
+    for i, existing in enumerate(games):
+        if _same_title(existing["title"], game["title"]):
+            games[i] = game
+            break
+    else:
+        games.append(game)
+    save(path, games)
+
+
+def delete(path: Path, title: str) -> bool:
+    """Remove a game from the archive. False if it was not there."""
+    games = load(path)
+    remaining = [g for g in games if not _same_title(g["title"], title)]
+    if len(remaining) == len(games):
+        return False
+    save(path, remaining)
+    return True
