@@ -1,7 +1,8 @@
-"""Reading the game archive (a single JSON file)."""
+"""Reading and writing the game archive (a single JSON file)."""
 
 import json
 import os
+import tempfile
 from pathlib import Path
 
 DEFAULT_ARCHIVE = Path.home() / "Documents" / "videogame" / "games.json"
@@ -25,3 +26,50 @@ def load(path: Path) -> list[dict]:
     # the page blank.
     text = Path(path).read_text(encoding="utf-8").strip()
     return json.loads(text) if text else []
+
+
+def save(path: Path, games: list[dict]) -> None:
+    """Rewrite the archive.
+
+    The write is atomic: if the process dies halfway through, the previous
+    archive survives intact instead of being left truncated.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(games, ensure_ascii=False, indent=2) + "\n"
+
+    fd, scratch = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(scratch, path)
+    except BaseException:
+        Path(scratch).unlink(missing_ok=True)
+        raise
+
+
+def _same_title(one: str, other: str) -> bool:
+    """The title identifies the game, ignoring case and surrounding spaces."""
+    return one.strip().casefold() == other.strip().casefold()
+
+
+def upsert(path: Path, game: dict) -> None:
+    """Add a game to the archive, replacing the one with the same title."""
+    games = load(path)
+    for i, existing in enumerate(games):
+        if _same_title(existing["title"], game["title"]):
+            games[i] = game
+            break
+    else:
+        games.append(game)
+    save(path, games)
+
+
+def delete(path: Path, title: str) -> bool:
+    """Remove a game from the archive. False if it was not there."""
+    games = load(path)
+    remaining = [g for g in games if not _same_title(g["title"], title)]
+    if len(remaining) == len(games):
+        return False
+    save(path, remaining)
+    return True

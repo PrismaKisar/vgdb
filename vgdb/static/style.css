@@ -4,6 +4,8 @@
   --muted: #78786f;
   --border: #e3e3de;
   --row: #f3f3f0;
+  --accent: #3b6ea5;
+  --danger: #b3261e;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -13,6 +15,8 @@
     --muted: #8b8b84;
     --border: #2e2e33;
     --row: #1e1e22;
+    --accent: #7aa7d9;
+    --danger: #f2b8b5;
   }
 }
 
@@ -61,11 +65,48 @@ th {
   text-transform: uppercase;
 }
 
-td { padding: 0.5rem; border-bottom: 1px solid var(--border); }
+td { padding: 0; border-bottom: 1px solid var(--border); }
 
-tbody tr:hover { background: var(--row); }
+tbody#games tr:hover { background: var(--row); }
 
 .col-rating { width: 5rem; }
-.rating-cell { font-variant-numeric: tabular-nums; }
+.col-actions { width: 2.5rem; }
+
+/* Cells are inputs: changing a rating must not cost an extra click. */
+td input {
+  width: 100%;
+  padding: 0.45rem 0.5rem;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+
+td input:hover { border-color: var(--border); }
+
+td input:focus {
+  border-color: var(--accent);
+  background: var(--surface);
+  outline: none;
+}
+
+td input[type="number"] { font-variant-numeric: tabular-nums; }
+td input.invalid { border-color: var(--danger); }
+
+#draft td { border-bottom: 2px solid var(--border); }
+
+button {
+  width: 100%;
+  padding: 0.4rem;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: var(--muted);
+  cursor: pointer;
+  font: inherit;
+}
+
+button:hover { background: var(--border); color: var(--text); }
 
 #empty { margin-top: 2rem; color: var(--muted); text-align: center; }
