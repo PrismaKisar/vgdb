@@ -2,9 +2,18 @@
 
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template
+from flask import Flask, jsonify, render_template, request
 
 from vgdb import store
+
+OPTIONAL_FIELDS = ("notes",)
+
+
+def _valid_rating(rating) -> bool:
+    """A rating is how much the game was enjoyed: 1 to 10, half points allowed."""
+    if isinstance(rating, bool) or not isinstance(rating, (int, float)):
+        return False
+    return 1 <= rating <= 10
 
 
 def create_app(archive: Path) -> Flask:
@@ -20,5 +29,22 @@ def create_app(archive: Path) -> Flask:
     @app.get("/api/games")
     def listing():
         return jsonify(store.load(archive))
+
+    @app.put("/api/games/<title>")
+    def save_game(title):
+        body = request.get_json(silent=True) or {}
+
+        if not title.strip():
+            return jsonify({"error": "The title cannot be empty"}), 400
+        if not _valid_rating(body.get("rating")):
+            return jsonify({"error": "The rating must be a number from 1 to 10"}), 400
+
+        game = {"title": title.strip(), "rating": body["rating"]}
+        for field in OPTIONAL_FIELDS:
+            if body.get(field):
+                game[field] = body[field]
+
+        store.upsert(archive, game)
+        return jsonify(game)
 
     return app
