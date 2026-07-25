@@ -1,7 +1,8 @@
-"""Reading the game archive (a single JSON file)."""
+"""Reading and writing the game archive (a single JSON file)."""
 
 import json
 import os
+import tempfile
 from pathlib import Path
 
 DEFAULT_ARCHIVE = Path.home() / "Documents" / "videogame" / "games.json"
@@ -25,3 +26,23 @@ def load(path: Path) -> list[dict]:
     # the page blank.
     text = Path(path).read_text(encoding="utf-8").strip()
     return json.loads(text) if text else []
+
+
+def save(path: Path, games: list[dict]) -> None:
+    """Rewrite the archive.
+
+    The write is atomic: if the process dies halfway through, the previous
+    archive survives intact instead of being left truncated.
+    """
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(games, ensure_ascii=False, indent=2) + "\n"
+
+    fd, scratch = tempfile.mkstemp(dir=path.parent, suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write(text)
+        os.replace(scratch, path)
+    except BaseException:
+        Path(scratch).unlink(missing_ok=True)
+        raise
