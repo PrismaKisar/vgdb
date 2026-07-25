@@ -70,6 +70,20 @@ def test_titles_match_regardless_of_case(tmp_path):
     assert store.load(archive) == [{"title": "hollow knight", "rating": 7}]
 
 
+def test_find_returns_the_game_whatever_the_case(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(archive, [{"title": "Hollow Knight", "rating": 9}])
+
+    assert store.find(archive, "hollow knight")["rating"] == 9
+
+
+def test_find_returns_nothing_for_an_absent_game(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(archive, [{"title": "Hollow Knight", "rating": 9}])
+
+    assert store.find(archive, "Celeste") is None
+
+
 def test_renaming_replaces_the_game_instead_of_adding_one(tmp_path):
     archive = tmp_path / "games.json"
     store.save(archive, [{"title": "Celest", "rating": 8}])
