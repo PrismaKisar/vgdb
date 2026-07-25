@@ -60,6 +60,29 @@ def test_a_repeated_put_recalibrates_the_rating(client, archive):
     ]
 
 
+def test_fixing_a_title_does_not_create_a_duplicate(client, archive):
+    client.put("/api/games/Celest", json={"rating": 8, "notes": "typo in the title"})
+
+    response = client.put(
+        "/api/games/Celeste",
+        json={"rating": 8, "notes": "typo in the title", "previousTitle": "Celest"},
+    )
+
+    assert response.status_code == 200
+    assert store.load(archive) == [
+        {"title": "Celeste", "rating": 8, "notes": "typo in the title"}
+    ]
+
+
+def test_a_renamed_game_keeps_its_row(client, archive):
+    client.put("/api/games/First", json={"rating": 9})
+    client.put("/api/games/Second", json={"rating": 8})
+
+    client.put("/api/games/Renamed", json={"rating": 9, "previousTitle": "First"})
+
+    assert [g["title"] for g in store.load(archive)] == ["Renamed", "Second"]
+
+
 def test_delete_removes_the_game(client, archive):
     client.put("/api/games/Celeste", json={"rating": 8})
 

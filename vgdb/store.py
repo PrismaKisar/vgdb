@@ -53,11 +53,16 @@ def _same_title(one: str, other: str) -> bool:
     return one.strip().casefold() == other.strip().casefold()
 
 
-def upsert(path: Path, game: dict) -> None:
-    """Add a game to the archive, replacing the one with the same title."""
+def upsert(path: Path, game: dict, previous_title: str | None = None) -> None:
+    """Add a game to the archive, replacing the one it supersedes.
+
+    `previous_title` covers renaming: the entry keeps its position in the
+    archive instead of being deleted and re-appended at the end.
+    """
     games = load(path)
+    replaces = previous_title or game["title"]
     for i, existing in enumerate(games):
-        if _same_title(existing["title"], game["title"]):
+        if _same_title(existing["title"], replaces):
             games[i] = game
             break
     else:

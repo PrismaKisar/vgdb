@@ -70,6 +70,27 @@ def test_titles_match_regardless_of_case(tmp_path):
     assert store.load(archive) == [{"title": "hollow knight", "rating": 7}]
 
 
+def test_renaming_replaces_the_game_instead_of_adding_one(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(archive, [{"title": "Celest", "rating": 8}])
+
+    store.upsert(archive, {"title": "Celeste", "rating": 8}, previous_title="Celest")
+
+    assert store.load(archive) == [{"title": "Celeste", "rating": 8}]
+
+
+def test_a_renamed_game_keeps_its_position(tmp_path):
+    archive = tmp_path / "games.json"
+    store.save(
+        archive,
+        [{"title": "Celest", "rating": 8}, {"title": "Hades", "rating": 9}],
+    )
+
+    store.upsert(archive, {"title": "Celeste", "rating": 8}, previous_title="Celest")
+
+    assert [g["title"] for g in store.load(archive)] == ["Celeste", "Hades"]
+
+
 def test_delete_removes_only_the_named_game(tmp_path):
     archive = tmp_path / "games.json"
     store.save(

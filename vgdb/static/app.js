@@ -44,6 +44,10 @@ function readFields({ rating, notes }) {
 
 function row(game) {
   const tr = document.createElement("tr");
+  // The server identifies a game by its title, so a rename has to say which
+  // entry it replaces — otherwise it would add a second one.
+  let storedTitle = game.title;
+
   const fields = {
     title: field(game.title),
     rating: field(game.rating, { type: "number", min: 1, max: 10, step: 0.5 }),
@@ -52,8 +56,10 @@ function row(game) {
   const inputs = Object.values(fields).map((f) => f.input);
 
   async function apply() {
+    const title = fields.title.input.value.trim();
     try {
-      await put(fields.title.input.value.trim(), readFields(fields));
+      await put(title, { ...readFields(fields), previousTitle: storedTitle });
+      storedTitle = title;
       inputs.forEach((input) => input.classList.remove("invalid"));
     } catch (error) {
       fields.rating.input.classList.add("invalid");
@@ -70,9 +76,8 @@ function row(game) {
   button.textContent = "×";
   button.title = "Rimuovi dall'archivio";
   button.addEventListener("click", async () => {
-    const title = fields.title.input.value.trim();
-    if (!confirm(`Rimuovere "${title}" dall'archivio?`)) return;
-    await remove(title);
+    if (!confirm(`Rimuovere "${storedTitle}" dall'archivio?`)) return;
+    await remove(storedTitle);
     tr.remove();
   });
   const actions = document.createElement("td");

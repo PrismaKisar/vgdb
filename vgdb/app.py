@@ -44,7 +44,7 @@ def create_app(archive: Path) -> Flask:
             if body.get(field):
                 game[field] = body[field]
 
-        store.upsert(archive, game)
+        store.upsert(archive, game, previous_title=body.get("previousTitle"))
         return jsonify(game)
 
     @app.delete("/api/games/<title>")
