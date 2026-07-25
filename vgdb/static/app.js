@@ -21,6 +21,10 @@ async function put(title, game) {
   }
 }
 
+async function remove(title) {
+  await fetch(`/api/games/${encodeURIComponent(title)}`, { method: "DELETE" });
+}
+
 function field(value, options = {}) {
   const input = document.createElement("input");
   input.value = value ?? "";
@@ -62,7 +66,19 @@ function row(game) {
     input.addEventListener("keydown", (e) => e.key === "Enter" && input.blur());
   }
 
-  tr.append(fields.title.cell, fields.rating.cell, fields.notes.cell);
+  const button = document.createElement("button");
+  button.textContent = "×";
+  button.title = "Rimuovi dall'archivio";
+  button.addEventListener("click", async () => {
+    const title = fields.title.input.value.trim();
+    if (!confirm(`Rimuovere "${title}" dall'archivio?`)) return;
+    await remove(title);
+    tr.remove();
+  });
+  const actions = document.createElement("td");
+  actions.append(button);
+
+  tr.append(fields.title.cell, fields.rating.cell, fields.notes.cell, actions);
   return tr;
 }
 
@@ -75,5 +91,35 @@ async function reload() {
   count.textContent = games.length ? `${games.length} giochi` : "";
   empty.hidden = games.length > 0;
 }
+
+const draft = {
+  title: document.getElementById("draft-title"),
+  rating: document.getElementById("draft-rating"),
+  notes: document.getElementById("draft-notes"),
+};
+
+async function add() {
+  const title = draft.title.value.trim();
+  if (!title) return;
+  const rating = draft.rating.value === "" ? null : Number(draft.rating.value);
+  try {
+    await put(title, { rating, notes: draft.notes.value.trim() });
+  } catch (error) {
+    draft.rating.classList.add("invalid");
+    draft.rating.title = error.message;
+    return;
+  }
+  Object.values(draft).forEach((input) => {
+    input.value = "";
+    input.classList.remove("invalid");
+  });
+  draft.title.focus();
+  await reload();
+}
+
+document.getElementById("add").addEventListener("click", add);
+Object.values(draft).forEach((input) =>
+  input.addEventListener("keydown", (e) => e.key === "Enter" && add()),
+);
 
 reload();

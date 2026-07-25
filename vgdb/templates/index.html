@@ -18,8 +18,17 @@
         <th class="col-title">Titolo</th>
         <th class="col-rating">Voto</th>
         <th class="col-notes">Note</th>
+        <th class="col-actions"></th>
       </tr>
     </thead>
+    <tbody id="draft">
+      <tr>
+        <td><input id="draft-title" placeholder="Nuovo gioco…" autocomplete="off"></td>
+        <td><input id="draft-rating" type="number" min="1" max="10" step="0.5" placeholder="—"></td>
+        <td><input id="draft-notes" placeholder="Cosa ti è piaciuto, cosa no…" autocomplete="off"></td>
+        <td><button id="add" title="Aggiungi">+</button></td>
+      </tr>
+    </tbody>
     <tbody id="games"></tbody>
   </table>
 
