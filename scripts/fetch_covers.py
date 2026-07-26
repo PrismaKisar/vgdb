@@ -10,7 +10,11 @@ environment or from the untracked .env file at the project root.
 """
 
 import re
+import urllib.parse
 from difflib import SequenceMatcher
+
+import sgdb
+from sgdb import fetch
 
 CONFIDENT = 0.75
 
@@ -38,3 +42,28 @@ def normalise(text: str) -> str:
 def closeness(term: str, name: str) -> float:
     """How confidently a storefront listing matches what we asked for."""
     return SequenceMatcher(None, normalise(term), normalise(name)).ratio()
+
+
+def from_steamgriddb(title: str, key: str) -> tuple[bytes, str] | None:
+    """Square artwork, if SteamGridDB knows this game."""
+    term = searchable(title)
+    found = sgdb.get(
+        f"/search/autocomplete/{urllib.parse.quote(term)}", key
+    ).get("data", [])
+    if not found:
+        return None
+
+    game = max(found, key=lambda g: closeness(term, g["name"]))
+    # A weak match must be reported as unresolved rather than silently
+    # attaching the artwork of a different game.
+    if closeness(term, game["name"]) < CONFIDENT:
+        return None
+
+    # 1:1 only; SteamGridDB also serves 2:3 and 92:43, which we do not want.
+    grids = sgdb.get(
+        f"/grids/game/{game['id']}?dimensions=512x512,1024x1024", key
+    ).get("data", [])
+    if not grids:
+        return None
+
+    return fetch(grids[0]["url"]), f"{game['name']} [sgdb {game['id']}]"
