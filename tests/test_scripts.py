@@ -86,11 +86,10 @@ def test_fetch_covers_records_what_it_downloads(archive, monkeypatch):
 
     assert fetch_covers.main() == 0
 
-    assert [g["cover"] for g in archive.games()] == [
-        "clair-obscur-expedition-33.webp",
-        "celeste.webp",
-    ]
-    assert (archive.covers_directory / "celeste.webp").exists()
+    stored = [g["cover"] for g in archive.games()]
+    assert stored[0].startswith("clair-obscur-expedition-33-")
+    assert stored[1].startswith("celeste-")
+    assert all((archive.covers_directory / name).exists() for name in stored)
 
 
 def test_fetch_covers_leaves_the_ratings_alone(archive, monkeypatch):
@@ -120,7 +119,8 @@ def test_fetch_covers_keeps_what_it_already_fetched_when_one_fails(
     fetch_covers.main()
 
     recorded = {g["title"]: g.get("cover") for g in archive.games()}
-    assert recorded == {"Clair Obscur: Expedition 33": None, "Celeste": "celeste.webp"}
+    assert recorded["Clair Obscur: Expedition 33"] is None
+    assert recorded["Celeste"].startswith("celeste-")
 
 
 def test_set_cover_records_the_artwork_against_a_partial_title(archive, monkeypatch):
@@ -128,9 +128,9 @@ def test_set_cover_records_the_artwork_against_a_partial_title(archive, monkeypa
 
     assert set_cover.main(["expedition", "801236"]) == 0
 
-    assert archive.find("Clair Obscur: Expedition 33")["cover"] == (
-        "clair-obscur-expedition-33.webp"
-    )
+    stored = archive.find("Clair Obscur: Expedition 33")["cover"]
+    assert stored.startswith("clair-obscur-expedition-33-")
+    assert (archive.covers_directory / stored).exists()
 
 
 def test_set_cover_writes_nothing_for_a_title_it_cannot_place(archive, monkeypatch):

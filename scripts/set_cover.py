@@ -15,7 +15,7 @@ import sys
 
 import sgdb
 
-from vgdb import config, covers
+from vgdb import config
 from vgdb.archive import Ambiguous, Archive
 
 
@@ -51,14 +51,13 @@ def main(argv: list[str]) -> int:
 
         try:
             art = sgdb.artwork_from(reference, key)
-            name = covers.store_for(archive.path, game["title"], art)
-            archive.set_cover(game["title"], name)
+            archive.attach_cover(game["title"], art)
         except Exception as error:
             print(f"  !  {game['title']}: {error}")
             failed += 1
             continue
 
-        size = (archive.covers_directory / name).stat().st_size
+        size = archive.cover_size(game["title"])
         print(f"  ok {game['title']}  <-  {reference}, {size // 1024} KB")
 
     return 1 if failed else 0

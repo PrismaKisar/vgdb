@@ -20,7 +20,7 @@ from difflib import SequenceMatcher
 import sgdb
 from sgdb import fetch
 
-from vgdb import config, covers
+from vgdb import config
 from vgdb.archive import Archive
 
 STEAM_SEARCH = "https://store.steampowered.com/api/storesearch/?term={}&l=english&cc=us"
@@ -144,15 +144,13 @@ def main() -> int:
         try:
             # Recorded one at a time: a network failure halfway through keeps
             # everything fetched so far instead of discarding the run.
-            name = covers.store_for(archive.path, title, art)
-            archive.set_cover(title, name)
+            archive.attach_cover(title, art)
         except Exception as error:
             print(f"  !  {title}: immagine illeggibile ({error})")
             missing.append(title)
             continue
 
-        size = (archive.covers_directory / name).stat().st_size
-        print(f"  ok {title}  <-  {source}, {size // 1024} KB")
+        print(f"  ok {title}  <-  {source}, {archive.cover_size(title) // 1024} KB")
         time.sleep(0.3)
 
     print(f"\n{len(games) - len(missing)}/{len(games)} copertine presenti.")

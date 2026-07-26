@@ -18,6 +18,10 @@ class Invalid(ValueError):
     """A game that breaks the rules of the archive."""
 
 
+class Unreadable(ValueError):
+    """Bytes offered as a cover that are not an image we can open."""
+
+
 class Ambiguous(LookupError):
     """A partial title that names more than one game."""
 
@@ -111,19 +115,67 @@ class Archive:
         # or fixing a typo in the title must not drop it.
         superseded = self.find(previous_title or title)
         if superseded and superseded.get("cover"):
-            game["cover"] = superseded["cover"]
+            game["cover"] = self._carried_cover(superseded["cover"], title)
 
         self._replace(previous_title or title, game)
         return game
 
-    def set_cover(self, title: str, filename: str) -> dict:
-        """Point an archived game at its cover file."""
+    def attach_cover(self, title: str, image: bytes) -> dict:
+        """Give this game a cover, and return the game it now belongs to.
+
+        The caller brings a title and the bytes of an image; the thumbnail,
+        the file name and the folder it lands in are ours. Raises Unreadable
+        if the bytes are not an image — nothing is written in that case, since
+        the thumbnail is made before anything touches the disk. A failure of
+        the disk itself is nobody's fault but ours and comes out as OSError.
+        """
         game = self.find(title)
         if game is None:
             raise LookupError(f"{title} is not in the archive")
-        game["cover"] = filename
-        self._replace(title, game)
+
+        try:
+            thumbnail = covers.thumbnail(image)
+        except OSError as unopenable:
+            raise Unreadable(f"{title}: not a readable image") from unopenable
+
+        folder = self.covers_directory
+        folder.mkdir(parents=True, exist_ok=True)
+
+        name = covers.name_for(game["title"])
+        (folder / name).write_bytes(thumbnail)
+
+        superseded = game.get("cover")
+        game["cover"] = name
+        self._replace(game["title"], game)
+
+        # A renamed game keeps its old cover until a new one is attached; the
+        # file it used to point at would otherwise stay behind for good.
+        if superseded and superseded != name:
+            (folder / superseded).unlink(missing_ok=True)
         return game
+
+    def _carried_cover(self, filename: str, title: str) -> str:
+        """The cover of a game that has just been renamed.
+
+        The file name is derived from the title, so a rename would leave the
+        artwork under the old one: orphaned, and free for a later game taking
+        that title to claim or overwrite. The file follows the game instead.
+        """
+        wanted = covers.name_for(title)
+        stored = self.covers_directory / filename
+        if filename == wanted or not stored.exists():
+            return filename
+        os.replace(stored, self.covers_directory / wanted)
+        return wanted
+
+    def cover_size(self, title: str) -> int:
+        """How many bytes the cover of this game takes on disk."""
+        game = self.find(title)
+        if game is None:
+            raise LookupError(f"{title} is not in the archive")
+        if not game.get("cover"):
+            raise LookupError(f"{title} has no cover")
+        return (self.covers_directory / game["cover"]).stat().st_size
 
     def remove(self, title: str) -> bool:
         """Take a game out of the archive. False if it was not there."""
