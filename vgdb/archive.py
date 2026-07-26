@@ -7,6 +7,8 @@ one is running.
 """
 
 import json
+import os
+import tempfile
 from pathlib import Path
 
 from vgdb import config, covers
@@ -113,3 +115,49 @@ class Archive:
 
         self._replace(previous_title or title, game)
         return game
+
+    def set_cover(self, title: str, filename: str) -> dict:
+        """Point an archived game at its cover file."""
+        game = self.find(title)
+        if game is None:
+            raise LookupError(f"{title} is not in the archive")
+        game["cover"] = filename
+        self._replace(title, game)
+        return game
+
+    def remove(self, title: str) -> bool:
+        """Take a game out of the archive. False if it was not there."""
+        games = self.games()
+        remaining = [g for g in games if not _same_title(g["title"], title)]
+        if len(remaining) == len(games):
+            return False
+        self._write(remaining)
+        return True
+
+    def _replace(self, superseded: str, game: dict) -> None:
+        games = self.games()
+        for i, existing in enumerate(games):
+            if _same_title(existing["title"], superseded):
+                games[i] = game
+                break
+        else:
+            games.append(game)
+        self._write(games)
+
+    def _write(self, games: list[dict]) -> None:
+        """Rewrite the archive.
+
+        The write is atomic: if the process dies halfway through, the previous
+        archive survives intact instead of being left truncated.
+        """
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        text = json.dumps(games, ensure_ascii=False, indent=2) + "\n"
+
+        fd, scratch = tempfile.mkstemp(dir=self.path.parent, suffix=".tmp")
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as f:
+                f.write(text)
+            os.replace(scratch, self.path)
+        except BaseException:
+            Path(scratch).unlink(missing_ok=True)
+            raise
