@@ -9,13 +9,18 @@ environment or from the untracked .env file at the project root.
     uv run scripts/fetch_covers.py --force    # refetch everything
 """
 
+import argparse
 import json
 import re
+import sys
+import time
 import urllib.parse
 from difflib import SequenceMatcher
 
 import sgdb
 from sgdb import fetch
+
+from vgdb import covers, store
 
 STEAM_SEARCH = "https://store.steampowered.com/api/storesearch/?term={}&l=english&cc=us"
 STEAM_CAPSULE = "https://cdn.cloudflare.steamstatic.com/steam/apps/{}/library_600x900.jpg"
@@ -95,3 +100,66 @@ def from_steam(title: str) -> tuple[bytes, str] | None:
     except Exception:
         art = fetch(STEAM_HEADER.format(app["id"]))
     return art, f"{app['name']} [steam {app['id']}]"
+
+
+def artwork_for(title: str, key: str | None) -> tuple[bytes, str] | None:
+    """The best artwork available for this title, or None if unresolved."""
+    sources = ([lambda: from_steamgriddb(title, key)] if key else []) + [
+        lambda: from_steam(title)
+    ]
+    for source in sources:
+        try:
+            if found := source():
+                return found
+        except Exception as error:
+            print(f"  !  {title}: {error}")
+    return None
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--force", action="store_true", help="refetch existing covers")
+    args = parser.parse_args()
+
+    key = sgdb.api_key()
+    print("Fonte: SteamGridDB" if key else "Fonte: Steam (nessuna chiave in .env)")
+
+    archive = store.archive_path()
+    games = store.load(archive)
+    missing = []
+
+    for game in games:
+        title = game["title"]
+        if game.get("cover") and not args.force:
+            continue
+
+        found = artwork_for(title, key)
+        if found is None:
+            print(f"  -  {title}: nessuna copertina trovata")
+            missing.append(title)
+            continue
+
+        art, source = found
+        try:
+            game["cover"] = covers.store_for(archive, title, art)
+        except Exception as error:
+            print(f"  !  {title}: immagine illeggibile ({error})")
+            missing.append(title)
+            continue
+
+        size = (covers.directory(archive) / game["cover"]).stat().st_size
+        print(f"  ok {title}  <-  {source}, {size // 1024} KB")
+        time.sleep(0.3)
+
+    store.save(archive, games)
+
+    print(f"\n{len(games) - len(missing)}/{len(games)} copertine presenti.")
+    if missing:
+        print("Da aggiungere a mano trascinandole nella pagina:")
+        for title in missing:
+            print(f"  - {title}")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
