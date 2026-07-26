@@ -1,0 +1,26 @@
+[
+  {
+    "title": "Hollow Knight",
+    "rating": 9,
+    "notes": "Precise combat, exploration with a voice of its own. The late backtracking drags a little.",
+    "platinum": true,
+    "cover": "hollow-knight.webp"
+  },
+  {
+    "title": "Cuphead",
+    "rating": 8.5,
+    "notes": "Hard but always legible: when you die you know why. The art and the music are half the game.",
+    "platinum": true
+  },
+  {
+    "title": "No Man's Sky",
+    "rating": 7,
+    "notes": "Beautiful to look at, but nothing sticks in all that procedural vastness.",
+    "platinum": false
+  },
+  {
+    "title": "Some Sequel Or Other",
+    "rating": 6,
+    "notes": "Finished it for the trophies only. Competent and forgettable: an example of writing a low rating down plainly."
+  }
+]
