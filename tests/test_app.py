@@ -1,16 +1,22 @@
+"""The HTTP seam: status codes, and the translation to and from the Archive.
+
+What a valid game *is* belongs to the Archive and is tested in test_archive.py.
+What is left here is the wire.
+"""
+
 import io
 import json
 
 import pytest
 from PIL import Image
 
-from vgdb import store
-from vgdb.app import create_app
+from vgdb.app import MAX_COVER_BYTES, create_app
+from vgdb.archive import Archive
 
 
 @pytest.fixture
 def archive(tmp_path):
-    return tmp_path / "games.json"
+    return Archive(tmp_path / "games.json")
 
 
 @pytest.fixture
@@ -36,92 +42,75 @@ def test_an_empty_archive_returns_no_games(client):
 
 def test_the_archived_games_are_listed(client, archive):
     games = [{"title": "Celeste", "rating": 8, "notes": "Hard but fair"}]
-    archive.write_text(json.dumps(games), encoding="utf-8")
+    archive.path.write_text(json.dumps(games), encoding="utf-8")
 
     assert client.get("/api/games").get_json() == games
 
 
-def test_put_records_a_new_game(client, archive):
+def test_put_records_a_game_and_answers_with_it(client, archive):
     response = client.put(
         "/api/games/Celeste", json={"rating": 8, "notes": "Hard but fair"}
     )
 
     assert response.status_code == 200
-    assert store.load(archive) == [
-        {"title": "Celeste", "rating": 8, "notes": "Hard but fair"}
-    ]
+    assert response.get_json() == {
+        "title": "Celeste",
+        "rating": 8,
+        "notes": "Hard but fair",
+    }
+    assert archive.games() == [response.get_json()]
 
 
-def test_a_repeated_put_recalibrates_the_rating(client, archive):
-    client.put("/api/games/Celeste", json={"rating": 8})
-
-    client.put("/api/games/Celeste", json={"rating": 6, "notes": "aged badly"})
-
-    assert store.load(archive) == [
-        {"title": "Celeste", "rating": 6, "notes": "aged badly"}
-    ]
-
-
-def test_a_won_platinum_is_recorded(client, archive):
-    client.put("/api/games/Celeste", json={"rating": 8, "platinum": True})
-
-    assert store.load(archive)[0]["platinum"] is True
-
-
-def test_a_missed_platinum_is_recorded_too(client, archive):
-    """False must survive: 'not won' is a different fact from 'no platinum exists'."""
+def test_a_platinum_survives_the_wire(client, archive):
+    """JSON null is how the page says 'this game has no platinum'."""
     client.put("/api/games/Celeste", json={"rating": 8, "platinum": False})
-
-    assert store.load(archive)[0]["platinum"] is False
-
-
-def test_a_game_without_a_platinum_carries_no_flag(client, archive):
-    client.put("/api/games/Celeste", json={"rating": 8, "platinum": None})
-
-    assert "platinum" not in store.load(archive)[0]
-
-
-def test_the_platinum_can_be_taken_back(client, archive):
-    client.put("/api/games/Celeste", json={"rating": 8, "platinum": True})
+    assert archive.games()[0]["platinum"] is False
 
     client.put("/api/games/Celeste", json={"rating": 8, "platinum": None})
+    assert "platinum" not in archive.games()[0]
 
-    assert "platinum" not in store.load(archive)[0]
 
-
-def test_fixing_a_title_does_not_create_a_duplicate(client, archive):
-    client.put("/api/games/Celest", json={"rating": 8, "notes": "typo in the title"})
+def test_a_rename_is_carried_across_as_previous_title(client, archive):
+    client.put("/api/games/Celest", json={"rating": 8})
 
     response = client.put(
-        "/api/games/Celeste",
-        json={"rating": 8, "notes": "typo in the title", "previousTitle": "Celest"},
+        "/api/games/Celeste", json={"rating": 8, "previousTitle": "Celest"}
     )
 
     assert response.status_code == 200
-    assert store.load(archive) == [
-        {"title": "Celeste", "rating": 8, "notes": "typo in the title"}
-    ]
+    assert [g["title"] for g in archive.games()] == ["Celeste"]
 
 
-def test_a_renamed_game_keeps_its_row(client, archive):
-    client.put("/api/games/First", json={"rating": 9})
-    client.put("/api/games/Second", json={"rating": 8})
+def test_a_game_the_archive_refuses_is_a_400_carrying_the_reason(client, archive):
+    response = client.put("/api/games/Celeste", json={"rating": 11})
 
-    client.put("/api/games/Renamed", json={"rating": 9, "previousTitle": "First"})
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "The rating must be a number from 1 to 10"
+    assert archive.games() == []
 
-    assert [g["title"] for g in store.load(archive)] == ["Renamed", "Second"]
+
+def test_a_whitespace_only_title_is_a_400(client, archive):
+    response = client.put("/api/games/%20%20", json={"rating": 8})
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "The title cannot be empty"
+    assert archive.games() == []
 
 
-def png_bytes():
+def test_a_put_with_no_body_at_all_is_a_400(client):
+    assert client.put("/api/games/Celeste").status_code == 400
+
+
+def png_bytes(width=600, height=900):
     out = io.BytesIO()
-    Image.new("RGB", (600, 900), "teal").save(out, format="PNG")
+    Image.new("RGB", (width, height), "teal").save(out, format="PNG")
     return out.getvalue()
 
 
 def attach(client, title, data=None, filename="art.png"):
     return client.post(
         f"/api/games/{title}/cover",
-        data={"file": (io.BytesIO(data or png_bytes()), filename)},
+        data={"file": (io.BytesIO(png_bytes() if data is None else data), filename)},
         content_type="multipart/form-data",
     )
 
@@ -132,37 +121,44 @@ def test_uploading_a_cover_attaches_it_to_the_game(client, archive):
     response = attach(client, "Celeste")
 
     assert response.status_code == 200
-    cover = store.load(archive)[0]["cover"]
-    assert (archive.parent / "covers" / cover).exists()
+    cover = response.get_json()["cover"]
+    assert archive.games()[0]["cover"] == cover
+    assert (archive.covers_directory / cover).exists()
 
 
 def test_the_stored_cover_can_be_fetched_back(client, archive):
     client.put("/api/games/Celeste", json={"rating": 8})
-    attach(client, "Celeste")
+    cover = attach(client, "Celeste").get_json()["cover"]
 
-    cover = store.load(archive)[0]["cover"]
     response = client.get(f"/covers/{cover}")
 
     assert response.status_code == 200
-    assert response.data == (archive.parent / "covers" / cover).read_bytes()
+    assert response.data == (archive.covers_directory / cover).read_bytes()
 
 
-def test_editing_a_game_keeps_its_cover(client, archive):
+def test_a_cover_for_an_unknown_game_is_a_404(client):
+    assert attach(client, "Missing").status_code == 404
+
+
+def test_a_request_with_no_file_is_answered_without_reading_the_archive(client):
+    """Whether the game exists is the archive's business, and it only tells us
+    inside the write. A request carrying no image is refused before that."""
+    response = client.post(
+        "/api/games/Missing/cover", data={}, content_type="multipart/form-data"
+    )
+
+    assert response.status_code == 400
+
+
+def test_a_request_carrying_no_file_is_a_400(client, archive):
     client.put("/api/games/Celeste", json={"rating": 8})
-    attach(client, "Celeste")
 
-    client.put("/api/games/Celeste", json={"rating": 6, "notes": "recalibrated"})
+    response = client.post(
+        "/api/games/Celeste/cover", data={}, content_type="multipart/form-data"
+    )
 
-    assert "cover" in store.load(archive)[0]
-
-
-def test_renaming_a_game_keeps_its_cover(client, archive):
-    client.put("/api/games/Celest", json={"rating": 8})
-    attach(client, "Celest")
-
-    client.put("/api/games/Celeste", json={"rating": 8, "previousTitle": "Celest"})
-
-    assert "cover" in store.load(archive)[0]
+    assert response.status_code == 400
+    assert "cover" not in archive.games()[0]
 
 
 def test_a_file_that_is_not_an_image_is_rejected(client, archive):
@@ -171,11 +167,29 @@ def test_a_file_that_is_not_an_image_is_rejected(client, archive):
     response = attach(client, "Celeste", data=b"not an image")
 
     assert response.status_code == 400
-    assert "cover" not in store.load(archive)[0]
+    assert "cover" not in archive.games()[0]
 
 
-def test_a_cover_for_an_unknown_game_is_a_404(client):
-    assert attach(client, "Missing").status_code == 404
+def test_an_archive_that_cannot_be_written_is_not_blamed_on_the_image(
+    client, archive, monkeypatch
+):
+    """A full disk is our problem, not 'that file is not a readable image'."""
+    client.put("/api/games/Celeste", json={"rating": 8})
+    monkeypatch.setattr(
+        type(archive), "attach_cover", lambda *_: (_ for _ in ()).throw(OSError("full"))
+    )
+
+    with pytest.raises(OSError):
+        attach(client, "Celeste")
+
+
+def test_an_oversized_upload_is_rejected(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8})
+
+    response = attach(client, "Celeste", data=b"x" * (MAX_COVER_BYTES + 1))
+
+    assert response.status_code == 400
+    assert "cover" not in archive.games()[0]
 
 
 def test_delete_removes_the_game(client, archive):
@@ -184,28 +198,8 @@ def test_delete_removes_the_game(client, archive):
     response = client.delete("/api/games/Celeste")
 
     assert response.status_code == 200
-    assert store.load(archive) == []
+    assert archive.games() == []
 
 
 def test_deleting_an_absent_game_is_a_404(client):
     assert client.delete("/api/games/Missing").status_code == 404
-
-
-@pytest.mark.parametrize("rating", [0, 11, -3, "eight", None])
-def test_an_invalid_rating_is_rejected(client, archive, rating):
-    response = client.put("/api/games/Celeste", json={"rating": rating})
-
-    assert response.status_code == 400
-    assert store.load(archive) == []
-
-
-def test_the_rating_allows_half_points(client, archive):
-    assert client.put("/api/games/Celeste", json={"rating": 7.5}).status_code == 200
-    assert store.load(archive)[0]["rating"] == 7.5
-
-
-def test_a_whitespace_only_title_is_rejected(client, archive):
-    response = client.put("/api/games/%20%20", json={"rating": 8})
-
-    assert response.status_code == 400
-    assert store.load(archive) == []

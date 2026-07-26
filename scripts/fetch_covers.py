@@ -20,7 +20,8 @@ from difflib import SequenceMatcher
 import sgdb
 from sgdb import fetch
 
-from vgdb import covers, store
+from vgdb import config
+from vgdb.archive import Archive
 
 STEAM_SEARCH = "https://store.steampowered.com/api/storesearch/?term={}&l=english&cc=us"
 STEAM_CAPSULE = "https://cdn.cloudflare.steamstatic.com/steam/apps/{}/library_600x900.jpg"
@@ -121,11 +122,11 @@ def main() -> int:
     parser.add_argument("--force", action="store_true", help="refetch existing covers")
     args = parser.parse_args()
 
-    key = sgdb.api_key()
+    key = config.steamgriddb_key()
     print("Fonte: SteamGridDB" if key else "Fonte: Steam (nessuna chiave in .env)")
 
-    archive = store.archive_path()
-    games = store.load(archive)
+    archive = Archive()
+    games = archive.games()
     missing = []
 
     for game in games:
@@ -141,17 +142,16 @@ def main() -> int:
 
         art, source = found
         try:
-            game["cover"] = covers.store_for(archive, title, art)
+            # Recorded one at a time: a network failure halfway through keeps
+            # everything fetched so far instead of discarding the run.
+            archive.attach_cover(title, art)
         except Exception as error:
             print(f"  !  {title}: immagine illeggibile ({error})")
             missing.append(title)
             continue
 
-        size = (covers.directory(archive) / game["cover"]).stat().st_size
-        print(f"  ok {title}  <-  {source}, {size // 1024} KB")
+        print(f"  ok {title}  <-  {source}, {archive.cover_size(title) // 1024} KB")
         time.sleep(0.3)
-
-    store.save(archive, games)
 
     print(f"\n{len(games) - len(missing)}/{len(games)} copertine presenti.")
     if missing:

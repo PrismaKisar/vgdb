@@ -4,8 +4,8 @@ import socket
 import threading
 import webbrowser
 
-from vgdb import store
 from vgdb.app import create_app
+from vgdb.archive import Archive
 
 PORT = 5757
 ADDRESS = f"http://127.0.0.1:{PORT}/"
@@ -24,8 +24,8 @@ def main() -> None:
         webbrowser.open(ADDRESS)
         return
 
-    archive = store.archive_path()
-    print(f"Archive: {archive}")
+    archive = Archive()
+    print(f"Archive: {archive.path}")
     print(f"vgdb on {ADDRESS} — Ctrl+C to stop")
 
     threading.Timer(0.5, webbrowser.open, [ADDRESS]).start()

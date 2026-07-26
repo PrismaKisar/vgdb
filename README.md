@@ -43,11 +43,16 @@ One JSON file, an array of objects, documented by
 | `rating` | number | 1 to 10, half points allowed. How much you enjoyed it. |
 | `notes` | string | Optional, and the reason the archive is worth anything: `8` alone says little, `8 — great combat but 40 hours of filler` is usable. |
 | `platinum` | boolean | `true` won, `false` missed, absent when there is no platinum or you don't remember. |
-| `cover` | string | Image file name under `covers/`. Managed by the app. |
+| `cover` | string | Image file name under `covers/`. Managed by the app; never set by hand. |
 
 It lives in `~/.vgdb/` — the archive as `games.json`, the artwork in `covers/` —
 **deliberately outside this repository**, which is public while the ratings are
 personal.
+
+The page and the cover scripts queue on a `.games.json.lock` next to it, so two
+of them saving at once cannot overwrite each other. A text editor knows nothing
+of that lock: an edit made by hand and saved after the page has saved wins, and
+takes the page's change with it.
 
 ## Covers
 
@@ -72,7 +77,7 @@ visible difference at the size they are displayed.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `VGDB_FILE` | `~/.vgdb/games.json` | Archive location. |
-| `VGDB_SGDB_KEY` | — | SteamGridDB API key, read from the environment or from an untracked `.env`. |
+| `VGDB_SGDB_KEY` | — | SteamGridDB API key, read from the environment or from an untracked `.env` in the directory you run the script from. |
 
 ## Development
 
@@ -81,8 +86,9 @@ uv sync
 uv run pytest
 ```
 
-The suite covers the two public seams — the `store` module and the HTTP API —
-plus the cover pipeline and the scripts. The page logic
+The suite covers the three public seams — the `Archive`, which owns what a game
+is and how a cover is attached to it; the HTTP API, which only translates to it;
+and the configuration — plus the scripts. The page logic
 (`vgdb/static/app.js`) has no build step and is verified by hand.
 
 ## License
