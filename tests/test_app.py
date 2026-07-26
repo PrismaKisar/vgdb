@@ -140,6 +140,16 @@ def test_a_cover_for_an_unknown_game_is_a_404(client):
     assert attach(client, "Missing").status_code == 404
 
 
+def test_a_request_with_no_file_is_answered_without_reading_the_archive(client):
+    """Whether the game exists is the archive's business, and it only tells us
+    inside the write. A request carrying no image is refused before that."""
+    response = client.post(
+        "/api/games/Missing/cover", data={}, content_type="multipart/form-data"
+    )
+
+    assert response.status_code == 400
+
+
 def test_a_request_carrying_no_file_is_a_400(client, archive):
     client.put("/api/games/Celeste", json={"rating": 8})
 

@@ -49,6 +49,11 @@ It lives in `~/.vgdb/` — the archive as `games.json`, the artwork in `covers/`
 **deliberately outside this repository**, which is public while the ratings are
 personal.
 
+The page and the cover scripts queue on a `.games.json.lock` next to it, so two
+of them saving at once cannot overwrite each other. A text editor knows nothing
+of that lock: an edit made by hand and saved after the page has saved wins, and
+takes the page's change with it.
+
 ## Covers
 
 `scripts/fetch_covers.py` pulls artwork from SteamGridDB, which offers square art

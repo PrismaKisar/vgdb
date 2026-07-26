@@ -6,6 +6,9 @@ page and the cover scripts — come through here, so the rules hold whichever
 one is running.
 """
 
+import contextlib
+import copy
+import fcntl
 import json
 import os
 import tempfile
@@ -34,6 +37,21 @@ class Ambiguous(LookupError):
 def _same_title(one: str, other: str) -> bool:
     """The title identifies the game, ignoring case and surrounding spaces."""
     return one.strip().casefold() == other.strip().casefold()
+
+
+def _game_named(games: list[dict], title: str) -> dict | None:
+    """The game this title names, in a list already read from the archive."""
+    return next((g for g in games if _same_title(g["title"], title)), None)
+
+
+def _replace(games: list[dict], superseded: str, game: dict) -> None:
+    """Put the game where the one it supersedes was, or at the end."""
+    for i, existing in enumerate(games):
+        if _same_title(existing["title"], superseded):
+            games[i] = game
+            break
+    else:
+        games.append(game)
 
 
 def _checked_rating(rating) -> int | float:
@@ -66,7 +84,7 @@ class Archive:
 
     def find(self, title: str) -> dict | None:
         """The game with exactly this title, or None."""
-        return next((g for g in self.games() if _same_title(g["title"], title)), None)
+        return _game_named(self.games(), title)
 
     def resolve(self, title: str) -> dict | None:
         """The game this title refers to, allowing a unique partial match.
@@ -97,6 +115,8 @@ class Archive:
         `previous_title` covers renaming: the entry keeps its position in the
         archive instead of being deleted and re-appended at the end.
         """
+        # The rules are checked before the archive is opened, so a refused game
+        # keeps no other writer waiting for a change that will not happen.
         title = title.strip()
         if not title:
             raise Invalid("The title cannot be empty")
@@ -111,13 +131,13 @@ class Archive:
         if isinstance(platinum, bool):
             game["platinum"] = platinum
 
-        # The cover is attached by its own operation, so recalibrating a rating
-        # or fixing a typo in the title must not drop it.
-        superseded = self.find(previous_title or title)
-        if superseded and superseded.get("cover"):
-            game["cover"] = self._carried_cover(superseded["cover"], title)
-
-        self._replace(previous_title or title, game)
+        with self._rewritten() as games:
+            # The cover is attached by its own operation, so recalibrating a
+            # rating or fixing a typo in the title must not drop it.
+            superseded = _game_named(games, previous_title or title)
+            if superseded and superseded.get("cover"):
+                game["cover"] = self._carried_cover(superseded["cover"], title)
+            _replace(games, previous_title or title, game)
         return game
 
     def attach_cover(self, title: str, image: bytes) -> dict:
@@ -129,24 +149,24 @@ class Archive:
         the thumbnail is made before anything touches the disk. A failure of
         the disk itself is nobody's fault but ours and comes out as OSError.
         """
-        game = self.find(title)
-        if game is None:
-            raise LookupError(f"{title} is not in the archive")
+        with self._rewritten() as games:
+            game = _game_named(games, title)
+            if game is None:
+                raise LookupError(f"{title} is not in the archive")
 
-        try:
-            thumbnail = covers.thumbnail(image)
-        except OSError as unopenable:
-            raise Unreadable(f"{title}: not a readable image") from unopenable
+            try:
+                thumbnail = covers.thumbnail(image)
+            except OSError as unopenable:
+                raise Unreadable(f"{title}: not a readable image") from unopenable
 
-        folder = self.covers_directory
-        folder.mkdir(parents=True, exist_ok=True)
+            folder = self.covers_directory
+            folder.mkdir(parents=True, exist_ok=True)
 
-        name = covers.name_for(game["title"])
-        (folder / name).write_bytes(thumbnail)
+            name = covers.name_for(game["title"])
+            (folder / name).write_bytes(thumbnail)
 
-        superseded = game.get("cover")
-        game["cover"] = name
-        self._replace(game["title"], game)
+            superseded = game.get("cover")
+            game["cover"] = name
 
         # A renamed game keeps its old cover until a new one is attached; the
         # file it used to point at would otherwise stay behind for good.
@@ -179,22 +199,44 @@ class Archive:
 
     def remove(self, title: str) -> bool:
         """Take a game out of the archive. False if it was not there."""
-        games = self.games()
-        remaining = [g for g in games if not _same_title(g["title"], title)]
-        if len(remaining) == len(games):
-            return False
-        self._write(remaining)
-        return True
+        with self._rewritten() as games:
+            remaining = [g for g in games if not _same_title(g["title"], title)]
+            removed = len(remaining) < len(games)
+            games[:] = remaining
+        return removed
 
-    def _replace(self, superseded: str, game: dict) -> None:
-        games = self.games()
-        for i, existing in enumerate(games):
-            if _same_title(existing["title"], superseded):
-                games[i] = game
-                break
-        else:
-            games.append(game)
-        self._write(games)
+    @contextlib.contextmanager
+    def _rewritten(self):
+        """Read the archive, let the caller change it, write it back.
+
+        The one way to change the archive, and the reason it is a private
+        seam: a caller given the games and left to write them back would be
+        reading and writing as two steps, and another writer landing between
+        them loses its judgement with no error and no way to notice. So the
+        whole read-modify-write happens under an exclusive lock and a second
+        writer waits, rather than starting from games about to go stale. That
+        covers everything coming through here — the page and the cover
+        scripts; a text editor rewriting the file knows nothing of the lock.
+
+        Nothing is written if the caller raises, or if it changed nothing. The
+        lock is not re-entrant: one of these inside another deadlocks.
+        """
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        # A lock on the archive itself would not hold: every write replaces
+        # the file, so the next writer would lock a different inode. The lock
+        # lives in a file of its own, which is never replaced.
+        with open(self._lock_path, "w") as guard:
+            fcntl.flock(guard, fcntl.LOCK_EX)
+            games = self.games()
+            unchanged = copy.deepcopy(games)
+            yield games
+            if games != unchanged:
+                self._write(games)
+
+    @property
+    def _lock_path(self) -> Path:
+        """Hidden: it is ours, and the owner's folder holds their data."""
+        return self.path.with_name(f".{self.path.name}.lock")
 
     def _write(self, games: list[dict]) -> None:
         """Rewrite the archive.
