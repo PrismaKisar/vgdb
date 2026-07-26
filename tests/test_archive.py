@@ -1,10 +1,18 @@
+import io
 import json
 from pathlib import Path
 
 import pytest
+from PIL import Image
 
 from vgdb import config
 from vgdb.archive import Ambiguous, Archive, Invalid
+
+
+def image_bytes(width=600, height=900, colour="teal"):
+    out = io.BytesIO()
+    Image.new("RGB", (width, height), colour).save(out, format="PNG")
+    return out.getvalue()
 
 
 @pytest.fixture
@@ -195,30 +203,123 @@ def test_a_renamed_game_keeps_its_position(archive):
     assert [g["title"] for g in archive.games()] == ["Celeste", "Hades"]
 
 
+# Attaching a cover: one operation, given a title and the image bytes. The
+# thumbnailing, the file name and where it lands are the Archive's business.
+
+
+def test_attaching_a_cover_points_the_game_at_a_stored_file(archive):
+    archive.record("Celeste", rating=8)
+
+    game = archive.attach_cover("Celeste", image_bytes())
+
+    assert archive.find("Celeste")["cover"] == game["cover"]
+    assert (archive.covers_directory / game["cover"]).exists()
+
+
+def test_a_cover_is_a_webp_that_keeps_the_shape_of_the_artwork(archive):
+    """Cropping to a square would cut the title off a 2:3 store poster."""
+    archive.record("Celeste", rating=8)
+
+    game = archive.attach_cover("Celeste", image_bytes(600, 900))
+
+    with Image.open(archive.covers_directory / game["cover"]) as thumb:
+        assert thumb.format == "WEBP"
+        assert thumb.size == (128, 192)
+
+
+def test_a_large_cover_is_shrunk_to_a_few_kilobytes(archive):
+    archive.record("Celeste", rating=8)
+
+    game = archive.attach_cover("Celeste", image_bytes(2000, 2000))
+
+    assert (archive.covers_directory / game["cover"]).stat().st_size < 20_000
+
+
+def test_a_cover_for_an_absent_game_is_refused(archive):
+    with pytest.raises(LookupError):
+        archive.attach_cover("Missing", image_bytes())
+
+
+def test_an_unreadable_image_leaves_the_game_as_it_was(archive):
+    archive.record("Celeste", rating=8)
+
+    with pytest.raises(OSError):
+        archive.attach_cover("Celeste", b"not an image")
+
+    assert "cover" not in archive.find("Celeste")
+
+
+def test_the_size_of_a_stored_cover_is_reported_without_asking_for_its_path(archive):
+    """What the cover scripts print after a fetch."""
+    archive.record("Celeste", rating=8)
+    game = archive.attach_cover("Celeste", image_bytes())
+
+    expected = (archive.covers_directory / game["cover"]).stat().st_size
+    assert archive.cover_size("Celeste") == expected
+
+
 # The cover is attached by its own operation, so an edit must not drop it.
 
 
 def test_recalibrating_a_rating_keeps_the_cover(archive):
     archive.record("Celeste", rating=8)
-    archive.set_cover("Celeste", "celeste.webp")
+    stored = archive.attach_cover("Celeste", image_bytes())["cover"]
 
     archive.record("Celeste", rating=6, notes="aged badly")
 
-    assert archive.games()[0]["cover"] == "celeste.webp"
+    assert archive.games()[0]["cover"] == stored
 
 
 def test_renaming_a_game_keeps_its_cover(archive):
     archive.record("Celest", rating=8)
-    archive.set_cover("Celest", "celest.webp")
+    stored = archive.attach_cover("Celest", image_bytes())["cover"]
 
     archive.record("Celeste", rating=8, previous_title="Celest")
 
-    assert archive.games()[0]["cover"] == "celest.webp"
+    assert archive.games()[0]["cover"] == stored
 
 
-def test_a_cover_for_an_absent_game_is_refused(archive):
-    with pytest.raises(LookupError):
-        archive.set_cover("Missing", "missing.webp")
+# One game, one cover file: no orphans on disk, and no two games sharing one.
+
+
+def test_replacing_a_cover_leaves_a_single_file_behind(archive):
+    archive.record("Celeste", rating=8)
+    archive.attach_cover("Celeste", image_bytes(600, 900))
+
+    archive.attach_cover("Celeste", image_bytes(400, 400, "crimson"))
+
+    assert len(list(archive.covers_directory.iterdir())) == 1
+
+
+def test_renaming_a_game_leaves_no_orphaned_cover_behind(archive):
+    """The file name follows the title, so the old one would linger."""
+    archive.record("Celest", rating=8)
+    archive.attach_cover("Celest", image_bytes())
+
+    archive.record("Celeste", rating=8, previous_title="Celest")
+    game = archive.attach_cover("Celeste", image_bytes(400, 400, "crimson"))
+
+    assert [f.name for f in archive.covers_directory.iterdir()] == [game["cover"]]
+
+
+def test_two_titles_that_read_alike_keep_separate_covers(archive):
+    """'Hollow Knight' and 'Hollow: Knight!' must not overwrite each other."""
+    archive.record("Hollow Knight", rating=9)
+    archive.record("Hollow: Knight!", rating=4)
+
+    one = archive.attach_cover("Hollow Knight", image_bytes())
+    other = archive.attach_cover("Hollow: Knight!", image_bytes(400, 400, "crimson"))
+
+    assert one["cover"] != other["cover"]
+    assert len(list(archive.covers_directory.iterdir())) == 2
+
+
+def test_a_title_of_symbols_alone_still_gets_a_cover(archive):
+    archive.record("!!!", rating=5)
+
+    game = archive.attach_cover("!!!", image_bytes())
+
+    assert (archive.covers_directory / game["cover"]).exists()
 
 
 def test_covers_sit_next_to_the_archive(archive, tmp_path):

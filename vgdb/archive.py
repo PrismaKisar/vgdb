@@ -116,14 +116,41 @@ class Archive:
         self._replace(previous_title or title, game)
         return game
 
-    def set_cover(self, title: str, filename: str) -> dict:
-        """Point an archived game at its cover file."""
+    def attach_cover(self, title: str, image: bytes) -> dict:
+        """Give this game a cover, and return the game it now belongs to.
+
+        The caller brings a title and the bytes of an image; the thumbnail,
+        the file name and the folder it lands in are ours. Raises OSError if
+        the bytes are not a readable image — nothing is written in that case,
+        since the thumbnail is made before anything touches the disk.
+        """
         game = self.find(title)
         if game is None:
             raise LookupError(f"{title} is not in the archive")
-        game["cover"] = filename
-        self._replace(title, game)
+
+        thumbnail = covers.thumbnail(image)
+        folder = self.covers_directory
+        folder.mkdir(parents=True, exist_ok=True)
+
+        name = covers.name_for(game["title"])
+        (folder / name).write_bytes(thumbnail)
+
+        superseded = game.get("cover")
+        game["cover"] = name
+        self._replace(game["title"], game)
+
+        # A renamed game keeps its old cover until a new one is attached; the
+        # file it used to point at would otherwise stay behind for good.
+        if superseded and superseded != name:
+            (folder / superseded).unlink(missing_ok=True)
         return game
+
+    def cover_size(self, title: str) -> int:
+        """How many bytes the cover of this game takes on disk."""
+        game = self.find(title)
+        if game is None or not game.get("cover"):
+            raise LookupError(f"{title} has no cover")
+        return (self.covers_directory / game["cover"]).stat().st_size
 
     def remove(self, title: str) -> bool:
         """Take a game out of the archive. False if it was not there."""
