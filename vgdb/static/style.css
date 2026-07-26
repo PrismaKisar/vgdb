@@ -43,17 +43,24 @@
 body {
   margin: 0 auto;
   padding: 2rem 1.5rem 4rem;
-  max-width: 60rem;
+  max-width: 68rem;
   background: var(--surface);
   color: var(--text);
   font: 15px/1.5 ui-sans-serif, -apple-system, "Segoe UI", sans-serif;
 }
 
+/* The archive is long: losing the header and the column names while
+   scrolling makes a recalibration pass much harder to follow. */
 header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
   display: flex;
   align-items: baseline;
   gap: 1rem;
-  margin-bottom: 1.5rem;
+  padding: 1rem 0 0.75rem;
+  margin-bottom: 0.5rem;
+  background: var(--surface);
 }
 
 h1 {
@@ -81,11 +88,15 @@ h1 {
   font-variant-numeric: tabular-nums;
 }
 
-table { width: 100%; border-collapse: collapse; }
+table { width: 100%; border-collapse: collapse; table-layout: fixed; }
 
 th {
+  position: sticky;
+  top: 3.75rem;
+  z-index: 1;
   padding: 0.3rem 0.5rem;
   border-bottom: 1px solid var(--border);
+  background: var(--surface);
   color: var(--muted);
   font-size: 0.75rem;
   font-weight: 600;
@@ -94,11 +105,13 @@ th {
   text-transform: uppercase;
 }
 
-td { padding: 0; border-bottom: 1px solid var(--border); }
+/* Notes can be several lines tall: everything else lines up with their top. */
+td { padding: 0; border-bottom: 1px solid var(--border); vertical-align: top; }
 
 tbody#games tr:hover { background: var(--row); }
 
 .col-cover { width: 3.75rem; }
+.col-title { width: 22%; }
 .col-rating { width: 5rem; }
 .col-platinum { width: 3rem; text-align: center; }
 .col-actions { width: 2.5rem; }
