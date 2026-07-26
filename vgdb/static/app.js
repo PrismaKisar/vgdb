@@ -126,14 +126,20 @@ function coverCell(game, titleNow) {
   return cell;
 }
 
-function field(value, { cellClass, ...options } = {}) {
-  const input = document.createElement("input");
+function field(value, { tag = "input", cellClass, ...options } = {}) {
+  const input = document.createElement(tag);
   input.value = value ?? "";
   Object.assign(input, options);
   const cell = document.createElement("td");
   if (cellClass) cell.className = cellClass;
   cell.append(input);
   return { input, cell };
+}
+
+/** Grow a notes box to fit its text: the notes are why the archive is useful. */
+function fitToText(textarea) {
+  textarea.style.height = "auto";
+  textarea.style.height = `${textarea.scrollHeight}px`;
 }
 
 /** The edited values of one row, in the shape the API expects. */
@@ -153,9 +159,16 @@ function row(game) {
   const fields = {
     title: field(game.title, { cellClass: "title-cell" }),
     rating: field(game.rating, { type: "number", min: 1, max: 10, step: 0.5 }),
-    notes: field(game.notes, { placeholder: "—" }),
+    notes: field(game.notes, {
+      tag: "textarea",
+      cellClass: "notes-cell",
+      rows: 1,
+      placeholder: "Perché ti è piaciuto, o perché no…",
+    }),
   };
   const inputs = Object.values(fields).map((f) => f.input);
+
+  fields.notes.input.addEventListener("input", () => fitToText(fields.notes.input));
 
   let platinum = game.platinum ?? null;
 
@@ -173,7 +186,10 @@ function row(game) {
 
   for (const input of inputs) {
     input.addEventListener("change", apply);
-    input.addEventListener("keydown", (e) => e.key === "Enter" && input.blur());
+    // Enter commits a one-line field, but inside the notes it means a new line.
+    if (input.tagName !== "TEXTAREA") {
+      input.addEventListener("keydown", (e) => e.key === "Enter" && input.blur());
+    }
   }
 
   const button = document.createElement("button");
@@ -233,6 +249,8 @@ async function reload() {
   // rows jump out from under the cursor during a recalibration pass.
   games.sort((a, b) => (b.rating ?? 0) - (a.rating ?? 0));
   tbody.replaceChildren(...games.map(row));
+  // scrollHeight only means something once the rows are in the document.
+  tbody.querySelectorAll("textarea").forEach(fitToText);
   filter();
 }
 
