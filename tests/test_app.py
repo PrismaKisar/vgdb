@@ -62,6 +62,33 @@ def test_a_repeated_put_recalibrates_the_rating(client, archive):
     ]
 
 
+def test_a_won_platinum_is_recorded(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8, "platinum": True})
+
+    assert store.load(archive)[0]["platinum"] is True
+
+
+def test_a_missed_platinum_is_recorded_too(client, archive):
+    """False must survive: 'not won' is a different fact from 'no platinum exists'."""
+    client.put("/api/games/Celeste", json={"rating": 8, "platinum": False})
+
+    assert store.load(archive)[0]["platinum"] is False
+
+
+def test_a_game_without_a_platinum_carries_no_flag(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8, "platinum": None})
+
+    assert "platinum" not in store.load(archive)[0]
+
+
+def test_the_platinum_can_be_taken_back(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8, "platinum": True})
+
+    client.put("/api/games/Celeste", json={"rating": 8, "platinum": None})
+
+    assert "platinum" not in store.load(archive)[0]
+
+
 def test_fixing_a_title_does_not_create_a_duplicate(client, archive):
     client.put("/api/games/Celest", json={"rating": 8, "notes": "typo in the title"})
 

@@ -51,6 +51,12 @@ def create_app(archive: Path) -> Flask:
             if body.get(field):
                 game[field] = body[field]
 
+        # Three states, not two: "not won" and "there is no platinum" are
+        # different facts, and only the second one means absent. Note that
+        # "not won" is False, which the loop above would drop as empty.
+        if isinstance(body.get("platinum"), bool):
+            game["platinum"] = body["platinum"]
+
         # The cover is attached by its own endpoint, so a plain edit of the
         # rating or the notes must not drop it.
         previous_title = body.get("previousTitle")
