@@ -4,6 +4,10 @@ A personal archive of videogames played and the judgements passed on them. It ex
 
 ## Language
 
+**Archive** → `archive`:
+The whole record of played games, and the only place a **Game** is written. It owns what a Game has to satisfy to be in it — a **Rating** on the scale, a title that names it — so the rules hold whichever writer is running: the page, the cover scripts, or the LLM. That it is a JSON file is incidental; see [ADR-0001](./docs/adr/0001-json-instead-of-a-database.md).
+_Avoid_: store, database, collection, library
+
 **Game** → `game`:
 A videogame the owner has already played, together with the judgement they gave it.
 _Avoid_: title, entry, record
@@ -33,6 +37,7 @@ _Avoid_: suggestion, automatic recommendation, prediction
 
 ## Relationships
 
+- The **Archive** holds every **Game**, and a Game exists only inside it
 - A **Game** has exactly one **Rating** and, optionally, **Notes**, a **Platinum** and a cover (`title`, `rating`, `notes`, `platinum`, `cover`)
 - A **Recommendation** draws on every **Game** but produces none: recommended games do not enter the archive until they have been played
 - **Recalibration** changes existing **Ratings**, never the **Games**
