@@ -11,6 +11,11 @@ a unique partial match is enough ("Expedition" finds the full title).
 """
 
 import re
+import sys
+
+import sgdb
+
+from vgdb import covers, store
 
 
 def looks_like_reference(argument: str) -> bool:
@@ -32,3 +37,42 @@ def resolve(games: list[dict], wanted: str) -> dict | None:
     if len(partial) > 1:
         print(f"  !  '{wanted}' è ambiguo: {', '.join(g['title'] for g in partial)}")
     return None
+
+
+def main(argv: list[str]) -> int:
+    if not argv or len(argv) % 2:
+        print(__doc__)
+        return 2
+
+    key = sgdb.api_key()
+    archive = store.archive_path()
+    games = store.load(archive)
+    failed = 0
+
+    for pair in zip(argv[::2], argv[1::2]):
+        # Either order: whichever half looks like a link or an id is the artwork.
+        reference, wanted = sorted(pair, key=looks_like_reference, reverse=True)
+
+        game = resolve(games, wanted)
+        if game is None:
+            print(f"  -  '{wanted}' non è in archivio")
+            failed += 1
+            continue
+
+        try:
+            art = sgdb.artwork_from(reference, key)
+            game["cover"] = covers.store_for(archive, game["title"], art)
+        except Exception as error:
+            print(f"  !  {game['title']}: {error}")
+            failed += 1
+            continue
+
+        size = (covers.directory(archive) / game["cover"]).stat().st_size
+        print(f"  ok {game['title']}  <-  {reference}, {size // 1024} KB")
+
+    store.save(archive, games)
+    return 1 if failed else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main(sys.argv[1:]))
