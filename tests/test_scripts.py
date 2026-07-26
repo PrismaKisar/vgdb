@@ -87,7 +87,8 @@ def test_fetch_covers_records_what_it_downloads(archive, monkeypatch):
     assert fetch_covers.main() == 0
 
     stored = [g["cover"] for g in archive.games()]
-    assert [name.split("-")[0] for name in stored] == ["clair", "celeste"]
+    assert stored[0].startswith("clair-obscur-expedition-33-")
+    assert stored[1].startswith("celeste-")
     assert all((archive.covers_directory / name).exists() for name in stored)
 
 

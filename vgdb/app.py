@@ -6,7 +6,7 @@ translates between HTTP and the archive, and nothing else.
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
-from vgdb.archive import Archive, Invalid
+from vgdb.archive import Archive, Invalid, Unreadable
 
 MAX_COVER_BYTES = 16 * 1024 * 1024
 
@@ -60,7 +60,7 @@ def create_app(archive: Archive) -> Flask:
 
         try:
             return jsonify(archive.attach_cover(game["title"], data))
-        except OSError:
+        except Unreadable:
             return jsonify({"error": "That file is not a readable image"}), 400
 
     @app.delete("/api/games/<title>")

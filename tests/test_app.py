@@ -160,6 +160,19 @@ def test_a_file_that_is_not_an_image_is_rejected(client, archive):
     assert "cover" not in archive.games()[0]
 
 
+def test_an_archive_that_cannot_be_written_is_not_blamed_on_the_image(
+    client, archive, monkeypatch
+):
+    """A full disk is our problem, not 'that file is not a readable image'."""
+    client.put("/api/games/Celeste", json={"rating": 8})
+    monkeypatch.setattr(
+        type(archive), "attach_cover", lambda *_: (_ for _ in ()).throw(OSError("full"))
+    )
+
+    with pytest.raises(OSError):
+        attach(client, "Celeste")
+
+
 def test_an_oversized_upload_is_rejected(client, archive):
     client.put("/api/games/Celeste", json={"rating": 8})
 

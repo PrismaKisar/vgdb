@@ -6,7 +6,7 @@ import pytest
 from PIL import Image
 
 from vgdb import config
-from vgdb.archive import Ambiguous, Archive, Invalid
+from vgdb.archive import Ambiguous, Archive, Invalid, Unreadable
 
 
 def image_bytes(width=600, height=900, colour="teal"):
@@ -243,10 +243,11 @@ def test_a_cover_for_an_absent_game_is_refused(archive):
 def test_an_unreadable_image_leaves_the_game_as_it_was(archive):
     archive.record("Celeste", rating=8)
 
-    with pytest.raises(OSError):
+    with pytest.raises(Unreadable):
         archive.attach_cover("Celeste", b"not an image")
 
     assert "cover" not in archive.find("Celeste")
+    assert not archive.covers_directory.exists()
 
 
 def test_the_size_of_a_stored_cover_is_reported_without_asking_for_its_path(archive):
@@ -272,11 +273,13 @@ def test_recalibrating_a_rating_keeps_the_cover(archive):
 
 def test_renaming_a_game_keeps_its_cover(archive):
     archive.record("Celest", rating=8)
-    stored = archive.attach_cover("Celest", image_bytes())["cover"]
+    archive.attach_cover("Celest", image_bytes())
+    artwork = (archive.covers_directory / archive.find("Celest")["cover"]).read_bytes()
 
     archive.record("Celeste", rating=8, previous_title="Celest")
 
-    assert archive.games()[0]["cover"] == stored
+    renamed = archive.games()[0]["cover"]
+    assert (archive.covers_directory / renamed).read_bytes() == artwork
 
 
 # One game, one cover file: no orphans on disk, and no two games sharing one.
@@ -297,9 +300,33 @@ def test_renaming_a_game_leaves_no_orphaned_cover_behind(archive):
     archive.attach_cover("Celest", image_bytes())
 
     archive.record("Celeste", rating=8, previous_title="Celest")
-    game = archive.attach_cover("Celeste", image_bytes(400, 400, "crimson"))
 
-    assert [f.name for f in archive.covers_directory.iterdir()] == [game["cover"]]
+    stored = archive.games()[0]["cover"]
+    assert [f.name for f in archive.covers_directory.iterdir()] == [stored]
+
+
+def test_a_game_taking_over_a_freed_title_does_not_take_its_artwork(archive):
+    """The renamed game's file would otherwise be there for the taking."""
+    archive.record("Celest", rating=8)
+    archive.attach_cover("Celest", image_bytes())
+    archive.record("Celeste", rating=8, previous_title="Celest")
+
+    archive.record("Celest", rating=3)
+    archive.attach_cover("Celest", image_bytes(400, 400, "crimson"))
+
+    renamed, newcomer = archive.games()
+    assert renamed["cover"] != newcomer["cover"]
+    assert (archive.covers_directory / renamed["cover"]).exists()
+
+
+def test_renaming_a_game_whose_cover_file_is_gone_still_works(archive):
+    archive.record("Celest", rating=8)
+    stored = archive.attach_cover("Celest", image_bytes())["cover"]
+    (archive.covers_directory / stored).unlink()
+
+    archive.record("Celeste", rating=8, previous_title="Celest")
+
+    assert archive.games() == [{"title": "Celeste", "rating": 8, "cover": stored}]
 
 
 def test_two_titles_that_read_alike_keep_separate_covers(archive):
