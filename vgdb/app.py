@@ -46,10 +46,6 @@ def create_app(archive: Archive) -> Flask:
 
     @app.post("/api/games/<title>/cover")
     def attach_cover(title):
-        game = archive.find(title)
-        if game is None:
-            return jsonify({"error": f"{title} is not in the archive"}), 404
-
         upload = request.files.get("file")
         if upload is None or not upload.filename:
             return jsonify({"error": "No image was sent"}), 400
@@ -58,8 +54,12 @@ def create_app(archive: Archive) -> Flask:
         if len(data) > MAX_COVER_BYTES:
             return jsonify({"error": "Image too large (max 16 MB)"}), 400
 
+        # The archive looks the game up itself, inside the same operation that
+        # writes it: looking it up here first would be half a read-modify-write.
         try:
-            return jsonify(archive.attach_cover(game["title"], data))
+            return jsonify(archive.attach_cover(title, data))
+        except LookupError as absent:
+            return jsonify({"error": str(absent)}), 404
         except Unreadable:
             return jsonify({"error": "That file is not a readable image"}), 400
 
