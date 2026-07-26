@@ -40,6 +40,43 @@ async function uploadCover(title, file) {
   return response.json();
 }
 
+// The real PlayStation platinum trophy, stored locally so the page keeps
+// working offline and does not lean on someone else's bandwidth.
+const TROPHY = `<img class="trophy" src="/static/platinum.webp" alt="">`;
+
+// Three states, cycled by clicking: won, missed, no platinum exists.
+const PLATINUM = [
+  { value: null, mark: "–", label: "Nessun platino / non lo so", css: "none" },
+  { value: true, mark: TROPHY, label: "Platino ottenuto", css: "won" },
+  { value: false, mark: TROPHY, label: "Platino non ottenuto", css: "missed" },
+];
+
+/** A trophy toggle. Calls back with the new state so the row can save it. */
+function platinumCell(game, onChange) {
+  const cell = document.createElement("td");
+  cell.className = "platinum-cell";
+  const button = document.createElement("button");
+
+  let index = PLATINUM.findIndex((s) => s.value === (game.platinum ?? null));
+
+  function paint() {
+    const state = PLATINUM[index];
+    button.innerHTML = state.mark;
+    button.title = state.label;
+    button.className = `platinum ${state.css}`;
+  }
+
+  button.addEventListener("click", () => {
+    index = (index + 1) % PLATINUM.length;
+    paint();
+    onChange(PLATINUM[index].value);
+  });
+
+  paint();
+  cell.append(button);
+  return cell;
+}
+
 /** A cover slot: click to pick a file, or drop one onto it. */
 function coverCell(game, titleNow) {
   const cell = document.createElement("td");
@@ -120,10 +157,12 @@ function row(game) {
   };
   const inputs = Object.values(fields).map((f) => f.input);
 
+  let platinum = game.platinum ?? null;
+
   async function apply() {
     const title = fields.title.input.value.trim();
     try {
-      await put(title, { ...readFields(fields), previousTitle: storedTitle });
+      await put(title, { ...readFields(fields), platinum, previousTitle: storedTitle });
       storedTitle = title;
       inputs.forEach((input) => input.classList.remove("invalid"));
     } catch (error) {
@@ -150,8 +189,19 @@ function row(game) {
   actions.append(button);
 
   const cover = coverCell(game, () => storedTitle);
+  const trophy = platinumCell(game, (state) => {
+    platinum = state;
+    apply();
+  });
 
-  tr.append(cover, fields.title.cell, fields.rating.cell, fields.notes.cell, actions);
+  tr.append(
+    cover,
+    fields.title.cell,
+    fields.rating.cell,
+    trophy,
+    fields.notes.cell,
+    actions,
+  );
   return tr;
 }
 
