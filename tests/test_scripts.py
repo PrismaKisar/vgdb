@@ -1,3 +1,4 @@
+import fetch_covers
 import sgdb
 
 
@@ -41,3 +42,19 @@ def test_a_plain_image_url_is_downloaded_as_is(monkeypatch):
     monkeypatch.setattr(sgdb, "fetch", lambda url, key=None: f"downloaded {url}".encode())
 
     assert sgdb.artwork_from("https://example.com/a.png", "k") == b"downloaded https://example.com/a.png"
+
+
+def test_edition_notes_are_dropped_before_searching():
+    assert fetch_covers.searchable("Shadow of the Colossus (Remake 2018)") == "Shadow of the Colossus"
+
+
+def test_a_title_the_storefronts_spell_differently_uses_its_alias():
+    assert fetch_covers.searchable("Spyro 2: Ripto's Rage! (Reignited)") == "Spyro Reignited Trilogy"
+
+
+def test_an_exact_listing_is_fully_confident():
+    assert fetch_covers.closeness("Hollow Knight", "Hollow Knight™") > fetch_covers.CONFIDENT
+
+
+def test_a_different_game_is_not_confident_enough():
+    assert fetch_covers.closeness("Ghost of Yotei", "Ghostrunner") < fetch_covers.CONFIDENT
