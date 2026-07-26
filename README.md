@@ -84,3 +84,9 @@ uv run pytest
 The suite covers the two public seams — the `store` module and the HTTP API —
 plus the cover pipeline and the scripts. The page logic
 (`vgdb/static/app.js`) has no build step and is verified by hand.
+
+## License
+
+[MIT](LICENSE), with one exception: the platinum trophy icon
+(`vgdb/static/platinum.webp`) is the property of Sony Interactive Entertainment
+and is not covered by this license. It is included for identification only.
