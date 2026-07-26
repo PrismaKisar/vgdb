@@ -1,4 +1,5 @@
 import fetch_covers
+import set_cover
 import sgdb
 
 
@@ -58,3 +59,34 @@ def test_an_exact_listing_is_fully_confident():
 
 def test_a_different_game_is_not_confident_enough():
     assert fetch_covers.closeness("Ghost of Yotei", "Ghostrunner") < fetch_covers.CONFIDENT
+
+
+ARCHIVE = [
+    {"title": "Clair Obscur: Expedition 33", "rating": 10},
+    {"title": "Hollow Knight", "rating": 9},
+    {"title": "Hollow Knight: Silksong", "rating": 9.5},
+]
+
+
+def test_a_link_is_told_apart_from_a_title():
+    assert set_cover.looks_like_reference("https://www.steamgriddb.com/grid/801236")
+    assert set_cover.looks_like_reference("801236")
+    assert not set_cover.looks_like_reference("Hollow Knight")
+
+
+def test_a_partial_title_finds_the_game():
+    assert set_cover.resolve(ARCHIVE, "expedition")["rating"] == 10
+
+
+def test_an_exact_title_wins_over_a_partial_match():
+    """'Hollow Knight' must not resolve to Silksong just because it matches it."""
+    assert set_cover.resolve(ARCHIVE, "Hollow Knight")["rating"] == 9
+
+
+def test_an_ambiguous_title_resolves_to_nothing():
+    """'hollow' matches both Hollow Knights, so it must not pick one at random."""
+    assert set_cover.resolve(ARCHIVE, "hollow") is None
+
+
+def test_an_unknown_title_resolves_to_nothing():
+    assert set_cover.resolve(ARCHIVE, "Celeste") is None
