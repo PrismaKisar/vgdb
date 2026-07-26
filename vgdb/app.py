@@ -1,29 +1,22 @@
-"""Web interface: one table of games."""
+"""Web interface: one table of games.
 
-from pathlib import Path
+Nothing here decides what a game is — that lives in the Archive. This module
+translates between HTTP and the archive, and nothing else.
+"""
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from vgdb import covers as cover_store
-from vgdb import store
+from vgdb.archive import Archive, Invalid
 
-OPTIONAL_FIELDS = ("notes",)
 MAX_COVER_BYTES = 16 * 1024 * 1024
 
 
-def _valid_rating(rating) -> bool:
-    """A rating is how much the game was enjoyed: 1 to 10, half points allowed."""
-    if isinstance(rating, bool) or not isinstance(rating, (int, float)):
-        return False
-    return 1 <= rating <= 10
-
-
-def create_app(archive: Path) -> Flask:
+def create_app(archive: Archive) -> Flask:
     app = Flask(__name__)
     # vgdb stays up for days: without this, a process started before an edit
     # keeps serving the template it compiled at boot.
     app.config["TEMPLATES_AUTO_RELOAD"] = True
-    covers = cover_store.directory(archive)
 
     @app.get("/")
     def page():
@@ -31,45 +24,30 @@ def create_app(archive: Path) -> Flask:
 
     @app.get("/covers/<name>")
     def cover(name):
-        return send_from_directory(covers, name)
+        return send_from_directory(archive.covers_directory, name)
 
     @app.get("/api/games")
     def listing():
-        return jsonify(store.load(archive))
+        return jsonify(archive.games())
 
     @app.put("/api/games/<title>")
     def save_game(title):
         body = request.get_json(silent=True) or {}
-
-        if not title.strip():
-            return jsonify({"error": "The title cannot be empty"}), 400
-        if not _valid_rating(body.get("rating")):
-            return jsonify({"error": "The rating must be a number from 1 to 10"}), 400
-
-        game = {"title": title.strip(), "rating": body["rating"]}
-        for field in OPTIONAL_FIELDS:
-            if body.get(field):
-                game[field] = body[field]
-
-        # Three states, not two: "not won" and "there is no platinum" are
-        # different facts, and only the second one means absent. Note that
-        # "not won" is False, which the loop above would drop as empty.
-        if isinstance(body.get("platinum"), bool):
-            game["platinum"] = body["platinum"]
-
-        # The cover is attached by its own endpoint, so a plain edit of the
-        # rating or the notes must not drop it.
-        previous_title = body.get("previousTitle")
-        existing = store.find(archive, previous_title or title)
-        if existing and existing.get("cover"):
-            game["cover"] = existing["cover"]
-
-        store.upsert(archive, game, previous_title=previous_title)
+        try:
+            game = archive.record(
+                title,
+                rating=body.get("rating"),
+                notes=body.get("notes"),
+                platinum=body.get("platinum"),
+                previous_title=body.get("previousTitle"),
+            )
+        except Invalid as refused:
+            return jsonify({"error": str(refused)}), 400
         return jsonify(game)
 
     @app.post("/api/games/<title>/cover")
     def attach_cover(title):
-        game = store.find(archive, title)
+        game = archive.find(title)
         if game is None:
             return jsonify({"error": f"{title} is not in the archive"}), 404
 
@@ -82,16 +60,15 @@ def create_app(archive: Path) -> Flask:
             return jsonify({"error": "Image too large (max 16 MB)"}), 400
 
         try:
-            game["cover"] = cover_store.store_for(archive, game["title"], data)
+            name = cover_store.store_for(archive.path, game["title"], data)
         except OSError:
             return jsonify({"error": "That file is not a readable image"}), 400
 
-        store.upsert(archive, game)
-        return jsonify(game)
+        return jsonify(archive.set_cover(game["title"], name))
 
     @app.delete("/api/games/<title>")
     def remove_game(title):
-        if not store.delete(archive, title):
+        if not archive.remove(title):
             return jsonify({"error": f"{title} is not in the archive"}), 404
         return jsonify({"removed": title})
 
