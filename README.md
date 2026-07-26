@@ -72,7 +72,7 @@ visible difference at the size they are displayed.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `VGDB_FILE` | `~/.vgdb/games.json` | Archive location. |
-| `VGDB_SGDB_KEY` | — | SteamGridDB API key, read from the environment or from an untracked `.env`. |
+| `VGDB_SGDB_KEY` | — | SteamGridDB API key, read from the environment or from an untracked `.env` in the directory you run the script from. |
 
 ## Development
 
@@ -81,8 +81,9 @@ uv sync
 uv run pytest
 ```
 
-The suite covers the two public seams — the `store` module and the HTTP API —
-plus the cover pipeline and the scripts. The page logic
+The suite covers the three public seams — the `Archive`, which owns what a game
+is; the HTTP API, which only translates to it; and the configuration — plus the
+cover pipeline and the scripts. The page logic
 (`vgdb/static/app.js`) has no build step and is verified by hand.
 
 ## License
