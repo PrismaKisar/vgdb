@@ -1,4 +1,10 @@
 .env
+
+# Personal data lives in ~/.vgdb, never in this repository — but if a real
+# archive ever lands here by accident, it must not be committable.
+games.json
+covers/
+
 __pycache__/
 *.pyc
 .pytest_cache/

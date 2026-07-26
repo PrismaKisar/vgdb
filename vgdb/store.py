@@ -5,14 +5,15 @@ import os
 import tempfile
 from pathlib import Path
 
-DEFAULT_ARCHIVE = Path.home() / "Documents" / "videogame" / "games.json"
+DEFAULT_ARCHIVE = Path.home() / ".vgdb" / "games.json"
 
 
 def archive_path() -> Path:
     """The archive location, always absolute.
 
-    `vgdb` runs from any directory, so a path relative to the working
-    directory would silently produce empty archives.
+    Outside the code repository on purpose: the ratings are personal and the
+    repository is public. `vgdb` also runs from any directory, so a path
+    relative to the working directory would silently produce empty archives.
     """
     chosen = os.environ.get("VGDB_FILE")
     return Path(chosen).expanduser().resolve() if chosen else DEFAULT_ARCHIVE

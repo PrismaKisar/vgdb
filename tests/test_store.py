@@ -123,10 +123,15 @@ def test_deleting_an_absent_game_reports_it(tmp_path):
     assert store.delete(archive, "Missing") is False
 
 
-def test_the_archive_path_does_not_depend_on_the_working_directory(monkeypatch):
+def test_the_archive_lives_outside_the_code_repository(monkeypatch):
+    """Personal ratings must not sit inside a repository that is public."""
     monkeypatch.delenv("VGDB_FILE", raising=False)
 
-    assert store.archive_path().is_absolute()
+    path = store.archive_path()
+
+    assert path.is_absolute()
+    assert path == Path.home() / ".vgdb" / "games.json"
+    assert Path(__file__).resolve().parent.parent not in path.parents
 
 
 def test_vgdb_file_overrides_the_default_archive(tmp_path, monkeypatch):
