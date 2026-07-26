@@ -53,6 +53,11 @@ def _same_title(one: str, other: str) -> bool:
     return one.strip().casefold() == other.strip().casefold()
 
 
+def find(path: Path, title: str) -> dict | None:
+    """The archived game with this title, or None."""
+    return next((g for g in load(path) if _same_title(g["title"], title)), None)
+
+
 def upsert(path: Path, game: dict, previous_title: str | None = None) -> None:
     """Add a game to the archive, replacing the one it supersedes.
 

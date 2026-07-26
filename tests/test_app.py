@@ -1,6 +1,8 @@
+import io
 import json
 
 import pytest
+from PIL import Image
 
 from vgdb import store
 from vgdb.app import create_app
@@ -81,6 +83,72 @@ def test_a_renamed_game_keeps_its_row(client, archive):
     client.put("/api/games/Renamed", json={"rating": 9, "previousTitle": "First"})
 
     assert [g["title"] for g in store.load(archive)] == ["Renamed", "Second"]
+
+
+def png_bytes():
+    out = io.BytesIO()
+    Image.new("RGB", (600, 900), "teal").save(out, format="PNG")
+    return out.getvalue()
+
+
+def attach(client, title, data=None, filename="art.png"):
+    return client.post(
+        f"/api/games/{title}/cover",
+        data={"file": (io.BytesIO(data or png_bytes()), filename)},
+        content_type="multipart/form-data",
+    )
+
+
+def test_uploading_a_cover_attaches_it_to_the_game(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8})
+
+    response = attach(client, "Celeste")
+
+    assert response.status_code == 200
+    cover = store.load(archive)[0]["cover"]
+    assert (archive.parent / "covers" / cover).exists()
+
+
+def test_the_stored_cover_can_be_fetched_back(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8})
+    attach(client, "Celeste")
+
+    cover = store.load(archive)[0]["cover"]
+    response = client.get(f"/covers/{cover}")
+
+    assert response.status_code == 200
+    assert response.data == (archive.parent / "covers" / cover).read_bytes()
+
+
+def test_editing_a_game_keeps_its_cover(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8})
+    attach(client, "Celeste")
+
+    client.put("/api/games/Celeste", json={"rating": 6, "notes": "recalibrated"})
+
+    assert "cover" in store.load(archive)[0]
+
+
+def test_renaming_a_game_keeps_its_cover(client, archive):
+    client.put("/api/games/Celest", json={"rating": 8})
+    attach(client, "Celest")
+
+    client.put("/api/games/Celeste", json={"rating": 8, "previousTitle": "Celest"})
+
+    assert "cover" in store.load(archive)[0]
+
+
+def test_a_file_that_is_not_an_image_is_rejected(client, archive):
+    client.put("/api/games/Celeste", json={"rating": 8})
+
+    response = attach(client, "Celeste", data=b"not an image")
+
+    assert response.status_code == 400
+    assert "cover" not in store.load(archive)[0]
+
+
+def test_a_cover_for_an_unknown_game_is_a_404(client):
+    assert attach(client, "Missing").status_code == 404
 
 
 def test_delete_removes_the_game(client, archive):

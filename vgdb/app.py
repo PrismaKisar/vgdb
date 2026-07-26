@@ -2,11 +2,13 @@
 
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, jsonify, render_template, request, send_from_directory
 
+from vgdb import covers as cover_store
 from vgdb import store
 
 OPTIONAL_FIELDS = ("notes",)
+MAX_COVER_BYTES = 16 * 1024 * 1024
 
 
 def _valid_rating(rating) -> bool:
@@ -21,10 +23,15 @@ def create_app(archive: Path) -> Flask:
     # vgdb stays up for days: without this, a process started before an edit
     # keeps serving the template it compiled at boot.
     app.config["TEMPLATES_AUTO_RELOAD"] = True
+    covers = cover_store.directory(archive)
 
     @app.get("/")
     def page():
         return render_template("index.html")
+
+    @app.get("/covers/<name>")
+    def cover(name):
+        return send_from_directory(covers, name)
 
     @app.get("/api/games")
     def listing():
@@ -44,7 +51,36 @@ def create_app(archive: Path) -> Flask:
             if body.get(field):
                 game[field] = body[field]
 
-        store.upsert(archive, game, previous_title=body.get("previousTitle"))
+        # The cover is attached by its own endpoint, so a plain edit of the
+        # rating or the notes must not drop it.
+        previous_title = body.get("previousTitle")
+        existing = store.find(archive, previous_title or title)
+        if existing and existing.get("cover"):
+            game["cover"] = existing["cover"]
+
+        store.upsert(archive, game, previous_title=previous_title)
+        return jsonify(game)
+
+    @app.post("/api/games/<title>/cover")
+    def attach_cover(title):
+        game = store.find(archive, title)
+        if game is None:
+            return jsonify({"error": f"{title} is not in the archive"}), 404
+
+        upload = request.files.get("file")
+        if upload is None or not upload.filename:
+            return jsonify({"error": "No image was sent"}), 400
+
+        data = upload.read(MAX_COVER_BYTES + 1)
+        if len(data) > MAX_COVER_BYTES:
+            return jsonify({"error": "Image too large (max 16 MB)"}), 400
+
+        try:
+            game["cover"] = cover_store.store_for(archive, game["title"], data)
+        except OSError:
+            return jsonify({"error": "That file is not a readable image"}), 400
+
+        store.upsert(archive, game)
         return jsonify(game)
 
     @app.delete("/api/games/<title>")
