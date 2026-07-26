@@ -1,6 +1,8 @@
 """Shared SteamGridDB access for the cover scripts."""
 
+import json
 import os
+import re
 import urllib.request
 from pathlib import Path
 
@@ -30,3 +32,21 @@ def fetch(url: str, key: str | None = None, timeout: int = 25) -> bytes:
     request = urllib.request.Request(url, headers=headers)
     with urllib.request.urlopen(request, timeout=timeout) as response:
         return response.read()
+
+
+def get(path: str, key: str) -> dict:
+    return json.loads(fetch(f"{API}{path}", key))
+
+
+GRID = re.compile(r"(?:https?://www\.steamgriddb\.com/grid/)?(\d+)")
+
+
+def artwork_from(reference: str, key: str) -> bytes:
+    """The image behind a SteamGridDB grid link, a grid id, or a plain URL.
+
+    A grid page (steamgriddb.com/grid/801236) is not an image, so its id has
+    to be resolved through the API before anything can be downloaded.
+    """
+    if match := GRID.fullmatch(reference.strip()):
+        return fetch(get(f"/grids/{match.group(1)}", key)["data"]["url"])
+    return fetch(reference)
