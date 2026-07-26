@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vgdb</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+  <header>
+    <h1>vgdb</h1>
+    <input type="search" id="search" placeholder="Cerca un titolo…" autocomplete="off">
+    <span id="count"></span>
+  </header>
+
+  <table>
+    <thead>
+      <tr>
+        <th class="col-cover"></th>
+        <th class="col-title">Titolo</th>
+        <th class="col-rating">Voto</th>
+        <th class="col-platinum" title="Platino">Plat.</th>
+        <th class="col-notes">Note</th>
+        <th class="col-actions"></th>
+      </tr>
+    </thead>
+    <tbody id="draft">
+      <tr>
+        <td></td>
+        <td><input id="draft-title" placeholder="Nuovo gioco…" autocomplete="off"></td>
+        <td><input id="draft-rating" type="number" min="1" max="10" step="0.5" placeholder="—"></td>
+        <td></td>
+        <td><input id="draft-notes" placeholder="Cosa ti è piaciuto, cosa no…" autocomplete="off"></td>
+        <td><button id="add" title="Aggiungi">+</button></td>
+      </tr>
+    </tbody>
+    <tbody id="games"></tbody>
+  </table>
+
+  <p id="empty" hidden>Nessun gioco in archivio.</p>
+
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
+</body>
+</html>
