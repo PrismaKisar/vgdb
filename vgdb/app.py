@@ -1,29 +1,22 @@
-"""Web interface: one table of games."""
+"""Web interface: one table of games.
 
-from pathlib import Path
+Nothing here decides what a game is — that lives in the Archive. This module
+translates between HTTP and the archive, and nothing else.
+"""
 
 from flask import Flask, jsonify, render_template, request, send_from_directory
 
 from vgdb import covers as cover_store
-from vgdb import store
+from vgdb.archive import Archive, Invalid
 
-OPTIONAL_FIELDS = ("notes",)
 MAX_COVER_BYTES = 16 * 1024 * 1024
 
 
-def _valid_rating(rating) -> bool:
-    """A rating is how much the game was enjoyed: 1 to 10, half points allowed."""
-    if isinstance(rating, bool) or not isinstance(rating, (int, float)):
-        return False
-    return 1 <= rating <= 10
-
-
-def create_app(archive: Path) -> Flask:
+def create_app(archive: Archive) -> Flask:
     app = Flask(__name__)
     # vgdb stays up for days: without this, a process started before an edit
     # keeps serving the template it compiled at boot.
     app.config["TEMPLATES_AUTO_RELOAD"] = True
-    covers = cover_store.directory(archive)
 
     @app.get("/")
     def page():
