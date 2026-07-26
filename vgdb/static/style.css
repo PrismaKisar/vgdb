@@ -6,6 +6,15 @@
   --row: #f3f3f0;
   --accent: #3b6ea5;
   --danger: #b3261e;
+
+  --tier-top: #8a6d1f;
+  --tier-top-bg: #f6edd2;
+  --tier-high: #2f6b45;
+  --tier-high-bg: #ddeee2;
+  --tier-mid: #4a5568;
+  --tier-mid-bg: #e8ebef;
+  --tier-low: #8a5a2b;
+  --tier-low-bg: #f2e6d8;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -17,6 +26,15 @@
     --row: #1e1e22;
     --accent: #7aa7d9;
     --danger: #f2b8b5;
+
+    --tier-top: #e3c777;
+    --tier-top-bg: #3a3018;
+    --tier-high: #8fd1a8;
+    --tier-high-bg: #1c3226;
+    --tier-mid: #b3bcc9;
+    --tier-mid-bg: #262b33;
+    --tier-low: #d8a877;
+    --tier-low-bg: #33271b;
   }
 }
 
@@ -127,7 +145,8 @@ tbody#games tr:hover { background: var(--row); }
 }
 
 /* Cells are inputs: changing a rating must not cost an extra click. */
-td input {
+td input, td textarea {
+  display: block;
   width: 100%;
   padding: 0.45rem 0.5rem;
   border: 1px solid transparent;
@@ -135,18 +154,51 @@ td input {
   background: none;
   color: inherit;
   font: inherit;
+  resize: none;
 }
 
-td input:hover { border-color: var(--border); }
+td input:hover, td textarea:hover { border-color: var(--border); }
 
-td input:focus {
+td input:focus, td textarea:focus {
   border-color: var(--accent);
   background: var(--surface);
   outline: none;
 }
 
-td input[type="number"] { font-variant-numeric: tabular-nums; }
-td input.invalid { border-color: var(--danger); }
+td input.invalid, td textarea.invalid { border-color: var(--danger); }
+
+.title-cell input { font-weight: 550; }
+
+/* The notes are the point of the archive — they must be readable at a glance. */
+.notes-cell textarea {
+  min-height: 2.5rem;
+  overflow: hidden;
+  line-height: 1.45;
+}
+
+/* The rating reads as a badge, coloured by band, so the ranking is scannable. */
+.rating-cell input {
+  width: 3.25rem;
+  margin: 0.4rem auto;
+  padding: 0.25rem 0.35rem;
+  border-radius: 999px;
+  background: var(--tier-mid-bg);
+  color: var(--tier-mid);
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+
+.rating-cell input::-webkit-outer-spin-button,
+.rating-cell input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.rating-cell input.tier-top { background: var(--tier-top-bg); color: var(--tier-top); }
+.rating-cell input.tier-high { background: var(--tier-high-bg); color: var(--tier-high); }
+.rating-cell input.tier-low { background: var(--tier-low-bg); color: var(--tier-low); }
 
 #draft td { border-bottom: 2px solid var(--border); }
 
