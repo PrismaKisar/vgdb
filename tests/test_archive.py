@@ -1,5 +1,9 @@
 import io
 import json
+import os
+import subprocess
+import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -46,10 +50,11 @@ def test_a_recorded_game_is_read_back(archive):
 
 
 def test_recording_leaves_no_scratch_files(archive, tmp_path):
+    """Only the archive and the lock two writers queue on, nothing half-written."""
     archive.record("Celeste", rating=8)
     archive.record("Celeste", rating=9)
 
-    assert [f.name for f in tmp_path.iterdir()] == ["games.json"]
+    assert sorted(f.name for f in tmp_path.iterdir()) == [".games.json.lock", "games.json"]
 
 
 def test_the_archive_stays_readable_by_hand(archive, tmp_path):
@@ -368,6 +373,65 @@ def test_removing_an_absent_game_reports_it(archive):
     archive.record("Celeste", rating=8)
 
     assert archive.remove("Missing") is False
+
+
+# Two writers at once — the page saving while a cover script runs. Both come
+# through the Archive, so one write landing inside another is normal operation
+# here, and losing a judgement to it would be silent.
+
+WRITER = """
+import sys, time
+from vgdb.archive import Archive
+
+path, title, pause = sys.argv[1], sys.argv[2], float(sys.argv[3])
+
+# Hold the writer open exactly where the danger is: it has read the archive
+# and made its change, and has not put it back yet.
+writing_back = Archive._write
+Archive._write = lambda self, games: (time.sleep(pause), writing_back(self, games))[1]
+
+Archive(path).record(title, rating=8)
+"""
+
+
+def writing(path, title, pause=0.0):
+    """Another process recording one game, dawdling mid-write if asked."""
+    return subprocess.Popen(
+        [sys.executable, "-c", WRITER, str(path), title, str(pause)],
+        env={**os.environ, "PYTHONPATH": os.pathsep.join(sys.path)},
+    )
+
+
+def test_a_write_landing_inside_another_one_is_not_lost(tmp_path):
+    """The second writer must wait for the first, not start from stale games."""
+    path = tmp_path / "games.json"
+    Archive(path).record("Celeste", rating=8)
+
+    dawdling = writing(path, "Hades", pause=2.0)
+    time.sleep(0.5)  # long enough for it to have read the archive
+    quick = writing(path, "Hollow Knight")
+
+    assert dawdling.wait(timeout=30) == 0
+    assert quick.wait(timeout=30) == 0
+    assert sorted(g["title"] for g in Archive(path).games()) == [
+        "Celeste",
+        "Hades",
+        "Hollow Knight",
+    ]
+
+
+def test_saving_one_edit_reads_the_archive_once(archive, monkeypatch):
+    """Reading twice is not just wasteful: the two reads can disagree."""
+    archive.record("Celeste", rating=8)
+    reads = []
+    reading = Archive.games
+    monkeypatch.setattr(
+        Archive, "games", lambda self: (reads.append(1), reading(self))[1]
+    )
+
+    archive.record("Celeste", rating=9, notes="better on replay")
+
+    assert len(reads) == 1
 
 
 # resolve(): the looser lookup the cover scripts need, where typing the whole
