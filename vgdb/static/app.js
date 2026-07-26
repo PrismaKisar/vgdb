@@ -136,6 +136,21 @@ function field(value, { tag = "input", cellClass, ...options } = {}) {
   return { input, cell };
 }
 
+const TIERS = [
+  [9.5, "tier-top"],
+  [8.5, "tier-high"],
+  [7, "tier-mid"],
+  [0, "tier-low"],
+];
+
+/** Colour the rating badge by band, so the ranking is scannable while scrolling. */
+function paintTier(input) {
+  const rating = Number(input.value);
+  const tier = TIERS.find(([floor]) => rating >= floor);
+  input.classList.remove(...TIERS.map(([, name]) => name));
+  if (input.value !== "") input.classList.add(tier[1]);
+}
+
 /** Grow a notes box to fit its text: the notes are why the archive is useful. */
 function fitToText(textarea) {
   textarea.style.height = "auto";
@@ -158,7 +173,13 @@ function row(game) {
 
   const fields = {
     title: field(game.title, { cellClass: "title-cell" }),
-    rating: field(game.rating, { type: "number", min: 1, max: 10, step: 0.5 }),
+    rating: field(game.rating, {
+      cellClass: "rating-cell",
+      type: "number",
+      min: 1,
+      max: 10,
+      step: 0.5,
+    }),
     notes: field(game.notes, {
       tag: "textarea",
       cellClass: "notes-cell",
@@ -169,6 +190,8 @@ function row(game) {
   const inputs = Object.values(fields).map((f) => f.input);
 
   fields.notes.input.addEventListener("input", () => fitToText(fields.notes.input));
+  paintTier(fields.rating.input);
+  fields.rating.input.addEventListener("input", () => paintTier(fields.rating.input));
 
   let platinum = game.platinum ?? null;
 
