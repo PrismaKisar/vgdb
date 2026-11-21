@@ -56,10 +56,9 @@ takes the page's change with it.
 
 ## Covers
 
-`scripts/fetch_covers.py` pulls artwork from SteamGridDB, which offers square art
-and indexes console exclusives. It needs a free API key (steamgriddb.com →
-Preferences → API). Without one it falls back to Steam, which requires no
-authentication but only has 2:3 posters and no PlayStation exclusives.
+`scripts/fetch_covers.py` pulls artwork from SteamGridDB only, which offers square
+art and indexes console exclusives. It needs a free API key (steamgriddb.com →
+Preferences → API); without one the script refuses to run.
 
 ```sh
 uv run scripts/fetch_covers.py                            # only the missing ones

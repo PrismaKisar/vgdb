@@ -1,7 +1,7 @@
-"""One-shot helper: pull missing covers from SteamGridDB, falling back to Steam.
+"""One-shot helper: pull missing covers from SteamGridDB.
 
-SteamGridDB is preferred: it has square artwork and it indexes console
-exclusives that Steam simply does not list. It needs a free API key
+SteamGridDB is the only source: square artwork, and it indexes console
+exclusives that storefronts like Steam do not list. It needs a free API key
 (steamgriddb.com -> Preferences -> API), read from VGDB_SGDB_KEY in the
 environment or from the untracked .env file at the project root.
 
@@ -10,7 +10,6 @@ environment or from the untracked .env file at the project root.
 """
 
 import argparse
-import json
 import re
 import sys
 import time
@@ -23,9 +22,6 @@ from sgdb import fetch
 from vgdb import config
 from vgdb.archive import Archive
 
-STEAM_SEARCH = "https://store.steampowered.com/api/storesearch/?term={}&l=english&cc=us"
-STEAM_CAPSULE = "https://cdn.cloudflare.steamstatic.com/steam/apps/{}/library_600x900.jpg"
-STEAM_HEADER = "https://cdn.cloudflare.steamstatic.com/steam/apps/{}/header.jpg"
 CONFIDENT = 0.75
 
 # Titles the archive records differently from the storefronts.
@@ -79,42 +75,13 @@ def from_steamgriddb(title: str, key: str) -> tuple[bytes, str] | None:
     return fetch(grids[0]["url"]), f"{game['name']} [sgdb {game['id']}]"
 
 
-def from_steam(title: str) -> tuple[bytes, str] | None:
-    """Poster artwork from Steam's keyless store API.
-
-    The fallback when there is no SteamGridDB key: no authentication needed,
-    but the art is 2:3 and console exclusives are simply absent.
-    """
-    term = searchable(title)
-    items = json.loads(
-        fetch(STEAM_SEARCH.format(urllib.parse.quote(term)))
-    ).get("items", [])
-    if not items:
-        return None
-
-    app = max(items, key=lambda i: closeness(term, i["name"]))
-    if closeness(term, app["name"]) < CONFIDENT:
-        return None
-
-    try:
-        art = fetch(STEAM_CAPSULE.format(app["id"]))
-    except Exception:
-        art = fetch(STEAM_HEADER.format(app["id"]))
-    return art, f"{app['name']} [steam {app['id']}]"
-
-
-def artwork_for(title: str, key: str | None) -> tuple[bytes, str] | None:
+def artwork_for(title: str, key: str) -> tuple[bytes, str] | None:
     """The best artwork available for this title, or None if unresolved."""
-    sources = ([lambda: from_steamgriddb(title, key)] if key else []) + [
-        lambda: from_steam(title)
-    ]
-    for source in sources:
-        try:
-            if found := source():
-                return found
-        except Exception as error:
-            print(f"  !  {title}: {error}")
-    return None
+    try:
+        return from_steamgriddb(title, key)
+    except Exception as error:
+        print(f"  !  {title}: {error}")
+        return None
 
 
 def main() -> int:
@@ -123,7 +90,9 @@ def main() -> int:
     args = parser.parse_args()
 
     key = config.steamgriddb_key()
-    print("Fonte: SteamGridDB" if key else "Fonte: Steam (nessuna chiave in .env)")
+    if not key:
+        print("Serve una chiave SteamGridDB: VGDB_SGDB_KEY nell'ambiente o in .env")
+        return 2
 
     archive = Archive()
     games = archive.games()

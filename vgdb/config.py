@@ -23,7 +23,7 @@ def archive_path() -> Path:
 
 
 def steamgriddb_key() -> str | None:
-    """The SteamGridDB key, or None — in which case Steam is the fallback.
+    """The SteamGridDB key, or None if unset — the cover scripts refuse to run without it.
 
     Read from the environment first, then from an untracked `.env` in the
     working directory, which is where the README says to run the scripts from.
