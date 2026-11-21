@@ -63,8 +63,8 @@ def test_put_records_a_game_and_answers_with_it(client, archive):
 
 def test_a_platinum_survives_the_wire(client, archive):
     """JSON null is how the page says 'this game has no platinum'."""
-    client.put("/api/games/Celeste", json={"rating": 8, "platinum": False})
-    assert archive.games()[0]["platinum"] is False
+    client.put("/api/games/Celeste", json={"rating": 8, "platinum": True})
+    assert archive.games()[0]["platinum"] is True
 
     client.put("/api/games/Celeste", json={"rating": 8, "platinum": None})
     assert "platinum" not in archive.games()[0]

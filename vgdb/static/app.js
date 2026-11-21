@@ -44,11 +44,10 @@ async function uploadCover(title, file) {
 // working offline and does not lean on someone else's bandwidth.
 const TROPHY = `<img class="trophy" src="/static/platinum.webp" alt="">`;
 
-// Three states, cycled by clicking: won, missed, no platinum exists.
+// Two states, toggled by clicking: won, or not recorded.
 const PLATINUM = [
-  { value: null, mark: "–", label: "Nessun platino / non lo so", css: "none" },
+  { value: null, mark: "–", label: "Nessun platino", css: "none" },
   { value: true, mark: TROPHY, label: "Platino ottenuto", css: "won" },
-  { value: false, mark: TROPHY, label: "Platino non ottenuto", css: "missed" },
 ];
 
 /** A trophy toggle. Calls back with the new state so the row can save it. */
@@ -57,7 +56,7 @@ function platinumCell(game, onChange) {
   cell.className = "platinum-cell";
   const button = document.createElement("button");
 
-  let index = PLATINUM.findIndex((s) => s.value === (game.platinum ?? null));
+  let index = PLATINUM.findIndex((s) => s.value === (game.platinum === true || null));
 
   function paint() {
     const state = PLATINUM[index];

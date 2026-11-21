@@ -118,7 +118,7 @@ tbody#games tr:hover { background: var(--row); }
 
 .platinum-cell { text-align: center; }
 
-/* Won, missed, or no platinum at all — three states, one click apart. */
+/* Won, or not — one click apart. */
 .platinum {
   width: auto;
   padding: 0.3rem 0.45rem;
@@ -128,11 +128,8 @@ tbody#games tr:hover { background: var(--row); }
 
 .trophy { display: block; width: auto; height: 1.6rem; margin: 0 auto; }
 
-/* Won is the trophy as it is; missed is the same cup drained of colour. */
-.platinum.missed .trophy { filter: grayscale(1) brightness(0.85); opacity: 0.45; }
 .platinum.none { color: var(--muted); opacity: 0.5; }
 .platinum:hover { background: var(--border); }
-.platinum.missed:hover .trophy { opacity: 0.75; }
 .platinum.none:hover { opacity: 0.9; }
 
 .cover {
