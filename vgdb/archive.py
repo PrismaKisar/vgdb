@@ -126,10 +126,9 @@ class Archive:
         # the owner wrote, and the page already trims before it gets here.
         if notes:
             game["notes"] = notes
-        # Three states, not two: "not won" and "there is no platinum" are
-        # different facts, and only the second one means absent.
-        if isinstance(platinum, bool):
-            game["platinum"] = platinum
+        # Only a won platinum is recorded; anything else is simply absent.
+        if platinum is True:
+            game["platinum"] = True
 
         with self._rewritten() as games:
             # The cover is attached by its own operation, so recalibrating a

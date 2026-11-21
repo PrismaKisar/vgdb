@@ -21,7 +21,7 @@ Free text on why the game was enjoyed or not. Also carries the outcome (e.g. "dr
 _Avoid_: comment, review, description
 
 **Platinum** → `platinum`:
-Whether the platinum trophy was earned (`true`), attempted and missed (`false`), or — when the field is absent — that the game has no platinum at all. The three states are deliberately distinct: "I didn't get it" says something about the player, "it doesn't exist" says nothing.
+Whether the platinum trophy was earned (`true`); absent otherwise. A missed platinum is not a separate state: why it was missed is what matters, and that belongs in the **Notes**.
 _Avoid_: completed, 100%, trophies
 
 **Feeling**:

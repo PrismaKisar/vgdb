@@ -30,7 +30,7 @@ cursor while you work. The search box filters by title, and the counter shows
 how many rows are visible out of the total.
 
 Covers are set by dropping an image on the thumbnail, or by clicking it. The
-platinum cell cycles through its three states with a click.
+platinum cell toggles with a click.
 
 ## The archive
 
@@ -42,7 +42,7 @@ One JSON file, an array of objects, documented by
 | `title` | string | Identifies the game; matched ignoring case and outer spaces. Required. |
 | `rating` | number | 1 to 10, half points allowed. How much you enjoyed it. |
 | `notes` | string | Optional, and the reason the archive is worth anything: `8` alone says little, `8 — great combat but 40 hours of filler` is usable. |
-| `platinum` | boolean | `true` won, `false` missed, absent when there is no platinum or you don't remember. |
+| `platinum` | boolean | `true` when won; absent otherwise. |
 | `cover` | string | Image file name under `covers/`. Managed by the app; never set by hand. |
 
 It lives in `~/.vgdb/` — the archive as `games.json`, the artwork in `covers/` —

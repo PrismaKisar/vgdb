@@ -126,7 +126,7 @@ def test_notes_can_be_taken_back(archive):
     assert "notes" not in archive.games()[0]
 
 
-# The Platinum: three states, and only one of them means absent.
+# The Platinum: recorded only when won.
 
 
 def test_a_won_platinum_is_recorded(archive):
@@ -135,11 +135,11 @@ def test_a_won_platinum_is_recorded(archive):
     assert archive.games()[0]["platinum"] is True
 
 
-def test_a_missed_platinum_is_recorded_too(archive):
-    """'Not won' says something about the player; it is not the same as 'no platinum'."""
+def test_a_missed_platinum_is_not_recorded(archive):
+    """'Not won' is not a state: the reason, if any, belongs in the notes."""
     archive.record("Celeste", rating=8, platinum=False)
 
-    assert archive.games()[0]["platinum"] is False
+    assert "platinum" not in archive.games()[0]
 
 
 def test_a_game_with_no_platinum_carries_no_flag(archive):
